@@ -1,0 +1,2866 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VLOG旅プランナー v19.5 (権限エラー対応版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
+    <style>
+        html, body {
+            height: 100%;
+            scroll-behavior: smooth;
+        }
+        body.overflow-hidden {
+            overflow: hidden;
+        }
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #FFFBF5;
+            color: #4A4A4A;
+        }
+        .active-filter, .tag-btn.active, .map-area-button.active, .tab-btn.active, #submission-tabs button.active {
+            background-color: #D35400 !important;
+            border-color: #D35400 !important;
+            color: white !important;
+            box-shadow: 0 4px 14px 0 rgba(0,0,0,0.1);
+        }
+        .card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .card-content { cursor: pointer; }
+        
+        .tag-btn {
+            background-color: #F5F5F5;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            transition: all 0.3s;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        #map-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            height: 400px;
+            margin: 1rem auto;
+        }
+        .yamanote-line {
+            position: absolute;
+            width: 80%;
+            height: 100%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 6px solid #9ACD32;
+            border-radius: 50%;
+        }
+        .osaka-loop-line {
+            position: absolute;
+            width: 80%;
+            height: 100%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 6px solid #FF8C00; /* Orange for Osaka Loop Line */
+            border-radius: 50%;
+        }
+        .map-area-button {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            background-color: #F5F5F5;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            border-radius: 9999px;
+            font-weight: 700;
+            transition: all 0.3s;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+        .map-area-button.tokyo { border-color: #9ACD32; }
+        .map-area-button.osaka { border-color: #FF8C00; }
+
+
+        .favorite-btn {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(4px);
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            z-index: 10;
+        }
+        .favorite-btn svg {
+            width: 20px;
+            height: 20px;
+            stroke: #6b7280;
+            stroke-width: 2;
+            fill: none;
+            transition: all 0.2s ease;
+        }
+        .favorite-btn.favorited svg {
+            fill: #ef4444;
+            stroke: #ef4444;
+        }
+        .favorite-btn:hover {
+            transform: scale(1.1);
+        }
+        #my-plan-panel, #mailbox-panel {
+            transition: transform 0.3s ease-in-out;
+        }
+        .plan-item.dragging {
+            opacity: 0.5;
+            background: #f0f0f0;
+        }
+        .transit-time {
+            padding-left: 1.5rem;
+            position: relative;
+            margin-left: 1.25rem;
+            border-left: 2px dashed #cbd5e1;
+            height: 3rem;
+            display: flex;
+            align-items: center;
+        }
+        .transit-time-icon {
+            position: absolute;
+            left: -0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #FFFBF5;
+            padding: 0.25rem;
+        }
+
+        .filter-overlay {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .filter-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .filter-modal {
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+        .filter-overlay.visible .filter-modal {
+            transform: translateY(0);
+        }
+
+        .move-handle {
+            cursor: grab;
+            padding: 0.5rem;
+        }
+        .move-handle:active {
+            cursor: grabbing;
+        }
+
+        .profile-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #D35400;
+        }
+        
+        .role-badge {
+            font-size: 0.7rem;
+            padding: 0.1rem 0.5rem;
+            border-radius: 9999px;
+            font-weight: 700;
+        }
+        
+        .cropper-container {
+            max-width: 100%;
+        }
+        #cropper-image-container {
+            height: 40vh;
+            max-height: 400px;
+        }
+        .cropper-view-box,
+        .cropper-face {
+            border-radius: 50%;
+        }
+
+        /* Styles for Admin Edit Form */
+        .admin-edit-form input, .admin-edit-form textarea, .admin-edit-form select {
+             width: 100%;
+             padding: 0.5rem;
+             border: 1px solid #ccc;
+             border-radius: 0.375rem;
+             margin-top: 0.25rem;
+        }
+        .admin-edit-form .tag-checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: #f9fafb;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+        }
+        .admin-edit-form .tag-checkbox {
+            display: flex;
+            align-items: center;
+        }
+
+        @supports (-webkit-line-clamp: 3) {
+            .line-clamp-3 {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                display: -webkit-box;
+                -webkit-line-clamp: 3;
+                -webkit-box-orient: vertical;
+            }
+        }
+    </style>
+</head>
+<body class="h-full">
+
+    <!-- Login/Signup Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-gray-900 bg-opacity-80 z-50 flex justify-center items-center">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+            <h2 id="auth-title" class="text-2xl font-bold text-[#D35400] mb-4">ログイン</h2>
+            <p id="auth-error" class="text-red-500 text-sm mb-4 h-5"></p>
+            <div class="space-y-4">
+                <input type="text" id="display-name-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg hidden" placeholder="ユーザー名">
+                <input type="email" id="email-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="メールアドレス">
+                <div class="relative">
+                    <input type="password" id="password-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="パスワード">
+                    <button id="password-toggle" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500"></button>
+                </div>
+                 <div class="relative hidden" id="confirm-password-wrapper">
+                    <input type="password" id="confirm-password-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="パスワード（確認用）">
+                    <button id="confirm-password-toggle" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500"></button>
+                </div>
+            </div>
+            <button id="auth-btn" class="w-full bg-[#E57373] text-white py-2.5 px-5 rounded-lg font-semibold hover:bg-[#D35400] transition-colors mt-6">ログイン</button>
+            <div class="my-4 flex items-center">
+                <div class="flex-grow border-t border-gray-300"></div>
+                <span class="flex-shrink mx-4 text-gray-500 text-sm">または</span>
+                <div class="flex-grow border-t border-gray-300"></div>
+            </div>
+            <button id="guest-login-btn" class="w-full bg-gray-200 text-gray-700 py-2.5 px-5 rounded-lg font-semibold hover:bg-gray-300 transition-colors">ゲストとして続ける</button>
+            <p class="mt-6 text-sm">
+                <span id="auth-switch-text">アカウントをお持ちでないですか？</span>
+                <a href="#" id="auth-switch-link" class="text-blue-600 hover:underline">新規登録はこちら</a>
+            </p>
+        </div>
+    </div>
+
+    <div id="app-container" class="hidden">
+        <div id="app" class="container mx-auto p-4 md:p-8 flex flex-col h-full">
+            <header id="app-header" class="text-center mb-4 flex-shrink-0">
+                <div class="flex justify-end items-center gap-4 absolute top-4 right-4">
+                    <div id="admin-controls" class="hidden items-center gap-2">
+                        <button id="open-submission-panel-btn" class="p-2 rounded-full hover:bg-gray-200 transition-colors relative">
+                            <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            <span id="submission-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"></span>
+                        </button>
+                        <select id="user-switcher" class="text-sm rounded-md border-gray-300 shadow-sm">
+                            <option value="">他のユーザーのプランを見る</option>
+                        </select>
+                    </div>
+                    <div id="user-display" class="flex items-center gap-2">
+                        <!-- User Icon, Name, and Role will be injected here -->
+                    </div>
+                    <button id="mailbox-btn" class="p-2 rounded-full hover:bg-gray-200 transition-colors relative">
+                        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"></path></svg>
+                        <span id="mailbox-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"></span>
+                    </button>
+                    <button id="user-settings-btn" class="p-2 rounded-full hover:bg-gray-200 transition-colors">
+                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    </button>
+                </div>
+                <h1 class="text-3xl md:text-5xl font-bold text-[#D35400] pt-16 md:pt-0">VLOG旅プランナー</h1>
+                <p class="mt-2 md:mt-4 text-base md:text-lg text-gray-600">専門学生のための究極ガイドをインタラクティブに体験！</p>
+            </header>
+
+            <nav id="app-nav" class="bg-white/70 backdrop-blur-md sticky top-4 z-20 p-4 rounded-xl shadow-lg mb-6 flex-shrink-0">
+                <div class="space-y-4">
+                    <div class="flex flex-wrap justify-center gap-2">
+                        <!-- Prefecture Filter -->
+                        <div class="flex items-center gap-2 bg-stone-200 p-1 rounded-full">
+                            <label for="prefecture-filter" class="pl-3 text-sm font-bold text-gray-600">都道府県:</label>
+                            <select id="prefecture-filter" class="bg-white border-none rounded-full py-2 px-3 text-sm sm:text-base font-semibold focus:ring-2 focus:ring-orange-500">
+                                <option value="all">すべての都道府県</option>
+                                <option value="tokyo">東京都</option>
+                                <option value="osaka">大阪府</option>
+                            </select>
+                        </div>
+                        <!-- Category Filters -->
+                        <div id="category-filters" class="flex items-center gap-1 bg-stone-200 p-1 rounded-full">
+                            <button data-filter="all" class="filter-btn rounded-full py-2 px-3 sm:px-5 text-xs sm:text-base font-semibold transition-all duration-300 active-filter">すべて</button>
+                            <button data-filter="観光" class="filter-btn rounded-full py-2 px-3 sm:px-5 text-xs sm:text-base font-semibold transition-all duration-300">📸 観光</button>
+                            <button data-filter="グルメ" class="filter-btn rounded-full py-2 px-3 sm:px-5 text-xs sm:text-base font-semibold transition-all duration-300">🍽️ グルメ</button>
+                            <button data-filter="favorites" class="filter-btn rounded-full py-2 px-3 sm:px-5 text-xs sm:text-base font-semibold transition-all duration-300">❤️ お気に入り</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-center gap-2 border-t pt-4">
+                        <button id="open-area-filter-btn" class="w-full sm:w-auto text-sm font-semibold bg-blue-100 text-blue-800 py-2 px-4 rounded-full hover:bg-blue-200 transition-colors disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed" disabled>🗺️ エリアで絞り込み</button>
+                        <button id="open-tag-filter-btn" class="w-full sm:w-auto text-sm font-semibold bg-teal-100 text-teal-800 py-2 px-4 rounded-full hover:bg-teal-200 transition-colors"># タグで絞り込み</button>
+                        <button id="add-spot-btn" class="w-full sm:w-auto text-sm font-semibold bg-green-100 text-green-800 py-2 px-4 rounded-full hover:bg-green-200 transition-colors">✨ スポットを追加</button>
+                    </div>
+                </div>
+            </nav>
+
+            <main id="main-content" class="flex-grow">
+                <section id="list-section">
+                    <h2 id="list-title" class="text-2xl font-bold mb-6 text-gray-800 text-center">すべてのスポット</h2>
+                    <div id="spots-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+                    <div id="loading-indicator" class="text-center py-10">
+                        <p class="text-lg text-gray-600">データを読み込んでいます...</p>
+                    </div>
+                </section>
+            </main>
+
+            <footer class="text-center mt-8 py-4 border-t border-stone-200 flex-shrink-0">
+                <p class="text-gray-500 text-sm">このアプリケーションは「専門学生のための究極の旅行ガイド」レポートを元に作成されました。</p>
+            </footer>
+        </div>
+
+        <!-- Add Spot Modal -->
+        <div id="add-spot-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-[#D35400]">新しいスポットを提案</h2>
+                    <button id="close-add-spot-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
+                </div>
+                <div id="add-spot-form-content">
+                    <p class="text-sm text-gray-600 mb-4">おすすめのスポット情報を入力してください。AIが内容を分析し、管理者の承認後にアプリに追加されます。</p>
+                    <div class="space-y-4">
+                        <input type="text" id="new-spot-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="スポットの名称">
+                        <input type="url" id="new-spot-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="公式サイトのURL">
+                    </div>
+                    <button id="submit-spot-btn" class="w-full bg-green-500 text-white py-2.5 px-5 rounded-lg font-semibold hover:bg-green-600 transition-colors mt-6 flex items-center justify-center gap-2">
+                        <div id="submit-spot-spinner" class="hidden w-5 h-5 border-t-2 border-b-2 border-white rounded-full animate-spin"></div>
+                        <span>AI分析と提案を送信</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Re-analysis Modal -->
+        <div id="re-analysis-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-[51] flex items-center justify-center p-4">
+            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-[#D35400]">都道府県の再分析</h2>
+                    <button id="close-re-analysis-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600 mb-4">AIが都道府県を特定できませんでした。このスポットのGoogleマップURLを貼り付けて、再度分析してください。</p>
+                    <div class="space-y-4">
+                        <input type="url" id="re-analysis-gmaps-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="GoogleマップのURL">
+                    </div>
+                    <button id="re-submit-spot-btn" class="w-full bg-orange-500 text-white py-2.5 px-5 rounded-lg font-semibold hover:bg-orange-600 transition-colors mt-6 flex items-center justify-center gap-2">
+                        <div id="re-submit-spot-spinner" class="hidden w-5 h-5 border-t-2 border-b-2 border-white rounded-full animate-spin"></div>
+                        <span>AIで再分析</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submission Panel -->
+        <div id="submission-panel-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-[#D35400]">提案の管理</h2>
+                    <button id="close-submission-panel-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
+                </div>
+                <div id="submission-tabs" class="border-b border-gray-200 mb-4">
+                    <nav class="flex space-x-4" aria-label="Tabs">
+                        <button data-tab="submissions" class="tab-btn active px-3 py-2 font-medium text-sm rounded-t-lg">
+                            スポット提案
+                        </button>
+                        <button data-tab="image-reports" class="tab-btn relative px-3 py-2 font-medium text-sm rounded-t-lg">
+                            画像レポート
+                            <span id="image-report-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"></span>
+                        </button>
+                    </nav>
+                </div>
+                <div id="submission-content">
+                    <div id="admin-tools" class="mb-4 p-3 bg-gray-100 rounded-lg border">
+                        <h3 class="font-bold text-gray-700 mb-2">管理者用ツール</h3>
+                        <button id="batch-update-images-btn" class="text-sm font-semibold bg-indigo-100 text-indigo-800 py-2 px-4 rounded-full hover:bg-indigo-200 transition-colors">
+                            🖼️ 全スポットの画像を更新
+                        </button>
+                    </div>
+                    <div id="submission-list" class="flex-grow overflow-y-auto space-y-4 py-4"></div>
+                </div>
+                <div id="image-report-content" class="hidden">
+                     <div id="image-report-list" class="flex-grow overflow-y-auto space-y-4 py-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Area Filter Overlay -->
+        <div id="area-filter-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col p-6">
+                <div class="flex justify-between items-center mb-4">
+                         <div class="flex items-center gap-4">
+                             <h2 class="text-2xl font-bold text-[#D35400]">エリアを選択</h2>
+                             <div id="area-view-switcher" class="flex items-center gap-1 bg-gray-200 p-1 rounded-full">
+                                 <button data-view="map" class="filter-btn rounded-full py-1 px-3 text-xs">🗺️ マップ</button>
+                                 <button data-view="list" class="filter-btn rounded-full py-1 px-3 text-xs">🗂️ リスト</button>
+                             </div>
+                         </div>
+                    <button id="close-area-filter-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
+                </div>
+                <div id="area-list-container" class="hidden flex-grow overflow-y-auto flex flex-wrap justify-center content-start gap-3 p-4">
+                    <!-- Area buttons will be rendered here -->
+                </div>
+                <div id="map-container" class="flex-grow relative">
+                    <!-- Map will be rendered here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Tag Filter Overlay -->
+        <div id="tag-filter-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+              <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-[#D35400]">タグを選択</h2>
+                    <button id="close-tag-filter-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
+                </div>
+                <div id="tag-filters" class="flex-grow overflow-y-auto flex flex-wrap justify-center content-start gap-3"></div>
+            </div>
+        </div>
+
+        <!-- User Settings Modal -->
+        <div id="user-settings-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-[#D35400]">ユーザー設定</h2>
+                    <button id="close-user-settings-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
+                </div>
+                <div id="user-settings-content" class="space-y-6">
+                    <div id="settings-icon-section">
+                        <label class="block text-sm font-medium text-gray-700">アイコン</label>
+                        <div class="mt-2 flex items-center gap-4">
+                            <img id="settings-icon-preview" src="" class="profile-icon" alt="現在のアイコン">
+                            <input type="file" id="icon-upload-input" class="hidden" accept="image/*">
+                            <button id="icon-upload-btn" class="bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                変更
+                            </button>
+                        </div>
+                    </div>
+                    <div id="settings-username-section">
+                        <label for="settings-username-input" class="block text-sm font-medium text-gray-700">ユーザー名</label>
+                        <div class="mt-1">
+                            <input type="text" id="settings-username-input" class="block w-full px-3 py-2 rounded-md focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border-gray-300 shadow-sm">
+                        </div>
+                    </div>
+                    <div id="settings-email-section">
+                        <label class="block text-sm font-medium text-gray-700">メールアドレス</label>
+                        <p id="settings-email" class="mt-1 text-lg text-gray-500"></p>
+                    </div>
+                    <div class="border-t pt-6 space-y-4">
+                        <button id="save-settings-btn" class="w-full bg-orange-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-orange-600 transition-colors">設定を保存</button>
+                        <button id="logout-btn-settings" class="w-full bg-red-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-600 transition-colors">ログアウト</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Cropper Modal -->
+        <div id="cropper-overlay" class="filter-overlay fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
+            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+                <h2 class="text-2xl font-bold text-[#D35400] mb-4">アイコンを編集</h2>
+                <div id="cropper-image-container" class="mb-4 bg-gray-200">
+                    <img id="cropper-image" src="">
+                </div>
+                <div class="flex justify-end gap-4">
+                    <button id="cropper-cancel-btn" class="py-2 px-6 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300">キャンセル</button>
+                    <button id="cropper-save-btn" class="py-2 px-6 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 flex items-center gap-2">
+                        <div id="icon-upload-spinner" class="hidden w-5 h-5 border-t-2 border-b-2 border-white rounded-full animate-spin"></div>
+                        <span>保存</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirmation Modal -->
+        <div id="confirmation-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+              <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+                <p id="confirmation-message" class="text-lg mb-6"></p>
+                <div class="flex justify-center gap-4">
+                    <button id="confirm-cancel-btn" class="py-2 px-6 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300">キャンセル</button>
+                    <button id="confirm-action-btn" class="py-2 px-6 text-white rounded-lg font-semibold transition-colors">削除</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info Modal -->
+        <div id="info-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+                <p id="info-message" class="text-lg mb-6"></p>
+                <button id="info-ok-btn" class="py-2 px-10 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600">OK</button>
+            </div>
+        </div>
+
+        <!-- Cross-Prefecture Confirmation Modal -->
+        <div id="cross-prefecture-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center">
+                <h3 class="text-xl font-bold text-gray-800 mb-2">プラン確認</h3>
+                <p id="cross-prefecture-message" class="text-base mb-6"></p>
+                <div class="flex flex-col gap-3">
+                    <button id="cross-prefecture-add-btn" class="w-full py-2 px-6 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600">そのまま追加する</button>
+                    <button id="cross-prefecture-favorite-btn" class="w-full py-2 px-6 bg-teal-500 text-white rounded-lg font-semibold hover:bg-teal-600">お気に入りに入れる</button>
+                    <button id="cross-prefecture-cancel-btn" class="w-full py-2 px-6 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300">追加しない</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Modal -->
+        <div id="modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-start pt-10 p-4 hidden opacity-0 transition-opacity duration-300 ease-in-out" data-spot-name="">
+            <div id="modal-content" class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto transform opacity-0 -translate-y-12 transition-all duration-300 ease-in-out">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-8">
+                    <div class="relative">
+                        <img id="modal-image" src="" alt="スポットの画像" class="w-full h-auto rounded-lg shadow-md object-cover aspect-video" onerror="this.onerror=null;this.src='https://placehold.co/600x400/E57373/FFF?text=Image+Not+Found';">
+                        <div id="modal-image-spinner" class="absolute inset-0 flex items-center justify-center bg-gray-200 rounded-lg hidden">
+                            <div class="w-8 h-8 border-t-2 border-b-2 border-orange-500 rounded-full animate-spin"></div>
+                        </div>
+                        <a id="modal-image-source" href="#" target="_blank" rel="noopener noreferrer" class="absolute bottom-2 left-2 text-xs bg-black/50 text-white py-1 px-2 rounded hidden"></a>
+                        <button id="report-image-btn" class="absolute bottom-2 right-2 bg-red-100 text-red-700 text-xs font-bold py-1 px-2 rounded-full hover:bg-red-200 transition-colors z-10">
+                            画像が違いますか？
+                        </button>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 id="modal-title" class="text-3xl font-bold text-[#D35400] pr-4"></h3>
+                            <button id="modal-close" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
+                        </div>
+                        <div id="modal-tags" class="flex flex-wrap gap-2 mb-4"></div>
+                        <p id="modal-description" class="text-gray-700 leading-relaxed"></p>
+                        <div class="mt-4 flex items-center gap-2 text-gray-600">
+                            <span class="text-xl">⏰</span>
+                            <span id="modal-stay-time" class="font-medium"></span>
+                        </div>
+                        <div class="mt-6 flex flex-wrap gap-4">
+                            <a id="modal-website" href="#" target="_blank" rel="noopener noreferrer" class="inline-block bg-[#E57373] text-white py-2 px-5 rounded-full font-semibold hover:bg-[#D35400] transition-colors">公式サイト 🔗</a>
+                            <a id="modal-map" href="#" target="_blank" rel="noopener noreferrer" class="inline-block bg-[#E57373] text-white py-2 px-5 rounded-full font-semibold hover:bg-[#D35400] transition-colors">Googleマップ 📍</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <button id="my-plan-btn" class="fixed bottom-6 right-6 bg-[#D35400] text-white w-16 h-16 rounded-full shadow-lg flex items-center justify-center z-30 transform hover:scale-110 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+            <span id="plan-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">0</span>
+        </button>
+
+        <div id="my-plan-panel-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden"></div>
+        <div id="my-plan-panel" class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-40 transform translate-x-full p-6 flex flex-col">
+            <div class="flex-shrink-0 flex justify-between items-center pb-4 border-b">
+                <h2 id="my-plan-title" class="text-2xl font-bold text-[#D35400]">マイプラン</h2>
+                <button id="my-plan-close-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
+            </div>
+            <div id="plan-items-list" class="flex-grow my-4 overflow-y-auto pr-4 min-h-0"></div>
+            <div id="plan-controls" class="flex-shrink-0 pt-4 border-t space-y-3">
+                <div class="flex justify-between items-center font-bold text-lg">
+                    <span>合計目安時間:</span>
+                    <span id="plan-total-time" class="text-[#D35400]">0分</span>
+                </div>
+                <p class="text-sm text-gray-500 -mt-2">※滞在・移動時間はあくまで目安です。</p>
+                <div class="flex gap-2 mt-4">
+                    <button id="clear-plan-btn" class="w-full bg-red-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-600 transition-colors">一括削除</button>
+                    <button id="copy-plan-btn" class="w-full bg-teal-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-teal-600 transition-colors">プランをコピー</button>
+                </div>
+                <div class="space-y-2 mt-2">
+                    <a id="route-map-btn" href="#" target="_blank" rel="noopener noreferrer" class="block w-full text-center bg-blue-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-600 transition-colors">ルートをマップで見る</a>
+                    <button id="route-map-from-current-btn" class="w-full bg-green-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-600 transition-colors">現在地からルートを見る</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mailbox Panel -->
+        <div id="mailbox-panel-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden"></div>
+        <div id="mailbox-panel" class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-40 transform translate-x-full p-6 flex flex-col">
+            <div class="flex-shrink-0 flex justify-between items-center pb-4 border-b">
+                <h2 class="text-2xl font-bold text-[#D35400]">お知らせ</h2>
+                <button id="mailbox-close-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
+            </div>
+            <div id="mailbox-list" class="flex-grow my-4 overflow-y-auto pr-4 min-h-0"></div>
+            <div class="flex-shrink-0 pt-4 border-t">
+                <button id="mark-all-as-read-btn" class="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors">すべて既読にする</button>
+            </div>
+        </div>
+
+        <!-- Prefecture Select Modal -->
+        <div id="prefecture-select-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+                <h3 id="prefecture-select-title" class="text-xl font-bold text-gray-800 mb-4"></h3>
+                <p id="prefecture-select-message" class="text-base mb-6"></p>
+                <div id="prefecture-select-buttons" class="flex flex-col gap-3">
+                    <!-- Buttons will be injected here -->
+                </div>
+                <button id="prefecture-select-cancel-btn" class="w-full mt-4 py-2 px-6 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300">キャンセル</button>
+            </div>
+        </div>
+
+        <!-- Progress Modal -->
+        <div id="progress-overlay" class="filter-overlay fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
+                <h3 id="progress-title" class="text-xl font-bold text-gray-800 mb-2">処理中です...</h3>
+                <p id="progress-message" class="text-base mb-4"></p>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <textarea id="copy-textarea" class="absolute -left-full"></textarea>
+
+    <!-- Cropper.jsのスクリプトを追加 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <script type="module">
+        // Firebase SDKのインポート
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            signInAnonymously,
+            signOut, 
+            onAuthStateChanged,
+            updateProfile
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            setDoc,
+            addDoc,
+            collection,
+            getDocs,
+            onSnapshot,
+            updateDoc,
+            deleteDoc,
+            serverTimestamp,
+            query,
+            where,
+            writeBatch
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { 
+            getStorage,
+            ref,
+            uploadBytes,
+            getDownloadURL
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        // Firebase Functions SDKのインポートを追加
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+
+
+        // Firebase Configuration
+        const firebaseConfig = {
+          apiKey: "AIzaSyDe8piUl7dbuR_FAn1pQkUfVtugh5HF4FU", // このキーは公開しても安全です
+          authDomain: "studio-gqqbe.firebaseapp.com",
+          projectId: "studio-gqqbe",
+          storageBucket: "studio-gqqbe.appspot.com",
+          messagingSenderId: "369252587708",
+          appId: "1:369252587708:web:86f2413bd89967e2a858b9"
+        };
+
+        // Firebaseサービスの初期化
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+        // Functionsサービスを初期化（リージョンを指定）
+        const functions = getFunctions(app, 'asia-northeast1');
+
+        // --- DATA (Will be loaded) ---
+        let allSpotsData = {};
+        let areaPositions = {};
+        let allTransitData = {};
+        let combinedSpots = [];
+        let supportedPrefectureNames = [];
+        let originalJsonData = {}; // To store the original structure for saving
+        
+        const standardTags = [
+            "絶景", "インスタ映え", "レトロ", "おしゃれ", "カワイイ", "ユニーク", "自然・癒し",
+            "食べ歩き", "ショッピング", "体験", "アート・建築", "夜景", "定番スポット",
+            "カフェ・喫茶店", "スイーツ", "ご当地グルメ", "B級グルメ", "ランチ", "ディナー",
+            "雨の日OK", "予約推奨", "コスパ", "無料"
+        ];
+        
+        const subCategories = {
+            "観光": ["定番スポット", "絶景", "夜景", "自然・癒し", "アート・建築", "レトロ", "体験"],
+            "グルメ": ["カフェ・喫茶店", "スイーツ", "ご当地グルメ", "B級グルメ", "ランチ", "ディナー", "食べ歩き"]
+        };
+
+        // --- Data Loading Function ---
+        async function loadAllData() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            loadingIndicator.classList.remove('hidden');
+            
+            const prefectureFiles = ['data/tokyo.json', 'data/osaka.json'];
+            const localSpots = [];
+            supportedPrefectureNames = []; // Reset before loading
+            try {
+                const responses = await Promise.all(prefectureFiles.map(file => fetch(`${file}?v=${new Date().getTime()}`)));
+                const jsonDataArray = await Promise.all(responses.map(res => res.json()));
+                
+                jsonDataArray.forEach((data, index) => {
+                    const prefectureId = prefectureFiles[index].split('/')[1].replace('.json', '');
+                    originalJsonData[prefectureId] = data; // Store original full structure
+                    allSpotsData[prefectureId] = data.spots;
+                    areaPositions[prefectureId] = data.areaPositions;
+                    allTransitData[prefectureId] = data.transitData;
+                    localSpots.push(...data.spots);
+                    if (data.name) {
+                        supportedPrefectureNames.push(data.name);
+                    }
+                });
+            } catch (error) {
+                console.error("ローカルデータの読み込みに失敗しました:", error);
+                loadingIndicator.innerHTML = `<p class="text-red-500">データの読み込みに失敗しました。ページを再読み込みしてください。</p>`;
+                return false;
+            }
+
+            combinedSpots = [...localSpots];
+
+            loadingIndicator.classList.add('hidden');
+            return true;
+        }
+
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadAllData();
+
+            // Get all DOM elements
+            const appContainer = document.getElementById('app-container');
+            const authModal = document.getElementById('auth-modal');
+            const authTitle = document.getElementById('auth-title');
+            const authBtn = document.getElementById('auth-btn');
+            const guestLoginBtn = document.getElementById('guest-login-btn');
+            const emailInput = document.getElementById('email-input');
+            const displayNameInput = document.getElementById('display-name-input');
+            const passwordInput = document.getElementById('password-input');
+            const confirmPasswordInput = document.getElementById('confirm-password-input');
+            const passwordToggle = document.getElementById('password-toggle');
+            const confirmPasswordWrapper = document.getElementById('confirm-password-wrapper');
+            const confirmPasswordToggle = document.getElementById('confirm-password-toggle');
+            const authSwitchLink = document.getElementById('auth-switch-link');
+            const authSwitchText = document.getElementById('auth-switch-text');
+            const authError = document.getElementById('auth-error');
+            const userDisplay = document.getElementById('user-display');
+            const userSettingsBtn = document.getElementById('user-settings-btn');
+            const myPlanTitle = document.getElementById('my-plan-title');
+            const spotsList = document.getElementById('spots-list');
+            const categoryFilters = document.getElementById('category-filters');
+            const listTitle = document.getElementById('list-title');
+            const openAreaFilterBtn = document.getElementById('open-area-filter-btn');
+            const areaFilterOverlay = document.getElementById('area-filter-overlay');
+            const closeAreaFilterBtn = document.getElementById('close-area-filter-btn');
+            const mapContainer = document.getElementById('map-container');
+            const openTagFilterBtn = document.getElementById('open-tag-filter-btn');
+            const tagFilterOverlay = document.getElementById('tag-filter-overlay');
+            const closeTagFilterBtn = document.getElementById('close-tag-filter-btn');
+            const tagFilters = document.getElementById('tag-filters');
+            const userSettingsOverlay = document.getElementById('user-settings-overlay');
+            const closeUserSettingsBtn = document.getElementById('close-user-settings-btn');
+            const settingsIconSection = document.getElementById('settings-icon-section');
+            const settingsUsernameSection = document.getElementById('settings-username-section');
+            const settingsEmailSection = document.getElementById('settings-email-section');
+            const settingsIconPreview = document.getElementById('settings-icon-preview');
+            const iconUploadInput = document.getElementById('icon-upload-input');
+            const iconUploadBtn = document.getElementById('icon-upload-btn');
+            const settingsUsernameInput = document.getElementById('settings-username-input');
+            const settingsEmail = document.getElementById('settings-email');
+            const logoutBtnSettings = document.getElementById('logout-btn-settings');
+            const adminControls = document.getElementById('admin-controls');
+            const userSwitcher = document.getElementById('user-switcher');
+            const cropperOverlay = document.getElementById('cropper-overlay');
+            const cropperImage = document.getElementById('cropper-image');
+            const cropperCancelBtn = document.getElementById('cropper-cancel-btn');
+            const cropperSaveBtn = document.getElementById('cropper-save-btn');
+            const iconUploadSpinner = document.getElementById('icon-upload-spinner');
+            const confirmationOverlay = document.getElementById('confirmation-overlay');
+            const confirmationMessage = document.getElementById('confirmation-message');
+            const confirmActionBtn = document.getElementById('confirm-action-btn');
+            const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+            const infoOverlay = document.getElementById('info-overlay');
+            const infoMessage = document.getElementById('info-message');
+            const infoOkBtn = document.getElementById('info-ok-btn');
+            const modal = document.getElementById('modal');
+            const modalClose = document.getElementById('modal-close');
+            const modalContent = document.getElementById('modal-content');
+            const myPlanBtn = document.getElementById('my-plan-btn');
+            const planCountBadge = document.getElementById('plan-count');
+            const myPlanPanel = document.getElementById('my-plan-panel');
+            const myPlanPanelOverlay = document.getElementById('my-plan-panel-overlay');
+            const myPlanCloseBtn = document.getElementById('my-plan-close-btn');
+            const planItemsList = document.getElementById('plan-items-list');
+            const planControls = document.getElementById('plan-controls');
+            const planTotalTimeEl = document.getElementById('plan-total-time');
+            const copyPlanBtn = document.getElementById('copy-plan-btn');
+            const clearPlanBtn = document.getElementById('clear-plan-btn');
+            const copyTextarea = document.getElementById('copy-textarea');
+            const routeMapBtn = document.getElementById('route-map-btn');
+            const routeMapFromCurrentBtn = document.getElementById('route-map-from-current-btn');
+            const prefectureFilter = document.getElementById('prefecture-filter');
+            const crossPrefectureOverlay = document.getElementById('cross-prefecture-overlay');
+            const crossPrefectureMessage = document.getElementById('cross-prefecture-message');
+            const crossPrefectureAddBtn = document.getElementById('cross-prefecture-add-btn');
+            const crossPrefectureFavoriteBtn = document.getElementById('cross-prefecture-favorite-btn');
+            const crossPrefectureCancelBtn = document.getElementById('cross-prefecture-cancel-btn');
+            const areaViewSwitcher = document.getElementById('area-view-switcher');
+            const areaListContainer = document.getElementById('area-list-container');
+            const addSpotBtn = document.getElementById('add-spot-btn');
+            const addSpotOverlay = document.getElementById('add-spot-overlay');
+            const closeAddSpotBtn = document.getElementById('close-add-spot-btn');
+            const submitSpotBtn = document.getElementById('submit-spot-btn');
+            const newSpotName = document.getElementById('new-spot-name');
+            const newSpotUrl = document.getElementById('new-spot-url');
+            const submitSpotSpinner = document.getElementById('submit-spot-spinner');
+            const openSubmissionPanelBtn = document.getElementById('open-submission-panel-btn');
+            const submissionPanelOverlay = document.getElementById('submission-panel-overlay');
+            const closeSubmissionPanelBtn = document.getElementById('close-submission-panel-btn');
+            const submissionList = document.getElementById('submission-list');
+            const submissionBadge = document.getElementById('submission-badge');
+            const modalImageSpinner = document.getElementById('modal-image-spinner');
+            const reAnalysisOverlay = document.getElementById('re-analysis-overlay');
+            const closeReAnalysisBtn = document.getElementById('close-re-analysis-btn');
+            const reAnalysisGmapsUrl = document.getElementById('re-analysis-gmaps-url');
+            const reSubmitSpotBtn = document.getElementById('re-submit-spot-btn');
+            const reSubmitSpotSpinner = document.getElementById('re-submit-spot-spinner');
+            const saveSettingsBtn = document.getElementById('save-settings-btn');
+            const mailboxBtn = document.getElementById('mailbox-btn');
+            const mailboxBadge = document.getElementById('mailbox-badge');
+            const mailboxPanel = document.getElementById('mailbox-panel');
+            const mailboxPanelOverlay = document.getElementById('mailbox-panel-overlay');
+            const mailboxCloseBtn = document.getElementById('mailbox-close-btn');
+            const mailboxList = document.getElementById('mailbox-list');
+            const markAllAsReadBtn = document.getElementById('mark-all-as-read-btn');
+            const batchUpdateImagesBtn = document.getElementById('batch-update-images-btn');
+            const prefectureSelectOverlay = document.getElementById('prefecture-select-overlay');
+            const prefectureSelectTitle = document.getElementById('prefecture-select-title');
+            const prefectureSelectMessage = document.getElementById('prefecture-select-message');
+            const prefectureSelectButtons = document.getElementById('prefecture-select-buttons');
+            const prefectureSelectCancelBtn = document.getElementById('prefecture-select-cancel-btn');
+            const progressOverlay = document.getElementById('progress-overlay');
+            const progressMessage = document.getElementById('progress-message');
+            const progressBar = document.getElementById('progress-bar');
+            const submissionTabs = document.getElementById('submission-tabs');
+            const submissionContent = document.getElementById('submission-content');
+            const imageReportContent = document.getElementById('image-report-content');
+            const imageReportList = document.getElementById('image-report-list');
+            const imageReportBadge = document.getElementById('image-report-badge');
+            const reportImageBtn = document.getElementById('report-image-btn');
+            
+            let currentPrefecture = 'all';
+            let currentFilters = { category: 'all', area: 'all', tag: 'all' };
+            let currentUser = null;
+            let localFavorites = [];
+            let localPlan = [];
+            let unsubscribePlan = null;
+            let unsubscribeFavorites = null;
+            let unsubscribeSpotSubmissions = null;
+            let unsubscribeImageReports = null;
+            let unsubscribeMailbox = null;
+            let unsubscribeAnnouncements = null; // Listener for public announcements
+            let localAnnouncements = []; // To store public announcements
+            
+            let isLoginMode = true;
+            let viewedUserId = null;
+            let cropper = null;
+            let areaFilterView = 'map'; // 'map' or 'list'
+            let pendingReAnalysisData = null;
+            let pendingSpotSubmissionsCount = 0;
+            let pendingImageReportsCount = 0;
+            
+            function showInfoModal(message) {
+                infoMessage.textContent = message;
+                infoOverlay.classList.add('visible');
+            }
+            infoOkBtn.addEventListener('click', () => infoOverlay.classList.remove('visible'));
+            infoOverlay.addEventListener('click', (e) => {
+                if (e.target === infoOverlay) infoOverlay.classList.remove('visible');
+            });
+
+            onAuthStateChanged(auth, user => {
+                if (user) {
+                    currentUser = user;
+                    viewedUserId = user.uid;
+                    authModal.classList.add('hidden');
+                    appContainer.classList.remove('hidden');
+                    initAppForUser(user);
+                } else {
+                    currentUser = null;
+                    authModal.classList.remove('hidden');
+                    appContainer.classList.add('hidden');
+                    adminControls.classList.add('hidden');
+                    if (unsubscribeSpotSubmissions) unsubscribeSpotSubmissions();
+                    if (unsubscribeImageReports) unsubscribeImageReports();
+                    if (unsubscribeMailbox) unsubscribeMailbox();
+                    if (unsubscribeAnnouncements) unsubscribeAnnouncements();
+                }
+            });
+
+            function handleAuth() {
+                const email = emailInput.value.trim();
+                const password = passwordInput.value.trim();
+                const displayName = displayNameInput.value.trim();
+                authError.textContent = '';
+
+                if (!email || !password) {
+                    authError.textContent = 'メールアドレスとパスワードを入力してください。';
+                    return;
+                }
+                if (!isLoginMode && !displayName) {
+                    authError.textContent = 'ユーザー名を入力してください。';
+                    return;
+                }
+
+                if (isLoginMode) {
+                    signInWithEmailAndPassword(auth, email, password)
+                        .catch(error => {
+                            authError.textContent = "メールアドレスまたはパスワードが違います。";
+                            console.error("Login error:", error);
+                        });
+                } else {
+                    const confirmPassword = confirmPasswordInput.value.trim();
+                    if (password !== confirmPassword) {
+                        authError.textContent = 'パスワードが一致しません。';
+                        return;
+                    }
+                    createUserWithEmailAndPassword(auth, email, password)
+                        .then(async (userCredential) => {
+                            const user = userCredential.user;
+                            await updateProfile(user, { displayName });
+                            await setDoc(doc(db, "users", user.uid), {
+                                displayName: displayName,
+                                email: user.email,
+                                photoURL: null, // Initialize photoURL
+                            });
+                            showInfoModal('アカウントを作成しました！ログインしてください。');
+                            toggleAuthMode();
+                        })
+                        .catch(error => {
+                            if (error.code === 'auth/email-already-in-use') {
+                                authError.textContent = "このメールアドレスは既に使用されています。";
+                            } else {
+                                authError.textContent = "アカウント作成に失敗しました。";
+                            }
+                            console.error("Signup error:", error);
+                        });
+                }
+            }
+            
+            function handleGuestLogin() {
+                signInAnonymously(auth).catch(error => {
+                    authError.textContent = "ゲストログインに失敗しました。";
+                    console.error("Anonymous sign-in error:", error);
+                });
+            }
+
+            function toggleAuthMode() {
+                isLoginMode = !isLoginMode;
+                authError.textContent = '';
+                displayNameInput.value = '';
+                emailInput.value = '';
+                passwordInput.value = '';
+                confirmPasswordInput.value = '';
+                if (isLoginMode) {
+                    authTitle.textContent = 'ログイン';
+                    authBtn.textContent = 'ログイン';
+                    displayNameInput.classList.add('hidden');
+                    confirmPasswordWrapper.classList.add('hidden');
+                    authSwitchText.textContent = 'アカウントをお持ちでないですか？';
+                    authSwitchLink.textContent = '新規登録はこちら';
+                } else {
+                    authTitle.textContent = '新規登録';
+                    authBtn.textContent = '登録する';
+                    displayNameInput.classList.remove('hidden');
+                    confirmPasswordWrapper.classList.remove('hidden');
+                    authSwitchText.textContent = 'すでにアカウントをお持ちですか？';
+                    authSwitchLink.textContent = 'ログインはこちら';
+                }
+            }
+
+            function handleLogout() {
+                signOut(auth).then(() => {
+                    location.reload();
+                });
+            }
+
+            async function initAppForUser(user) {
+                await user.getIdToken(true);
+                
+                userDisplay.innerHTML = ''; // Clear previous user info
+
+                const userDocRef = doc(db, "users", user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+
+                const photoURL = userData.photoURL || user.photoURL || 'https://placehold.co/40x40/D35400/FFF?text=�';
+                
+                const icon = document.createElement('img');
+                icon.src = photoURL;
+                icon.alt = 'プロフィールアイコン';
+                icon.className = 'profile-icon';
+                
+                const nameContainer = document.createElement('div');
+                nameContainer.className = 'flex flex-col items-start';
+
+                const nameEl = document.createElement('span');
+                nameEl.className = 'text-sm font-semibold text-gray-700';
+                nameEl.textContent = user.isAnonymous ? 'ゲスト' : (userData.displayName || user.displayName || '名無しさん');
+                
+                nameContainer.appendChild(nameEl);
+                userDisplay.appendChild(icon);
+                userDisplay.appendChild(nameContainer);
+
+                user.getIdTokenResult()
+                    .then(async (idTokenResult) => {
+                        const isAdmin = !!idTokenResult.claims.admin;
+                        
+                        const roleBadge = document.createElement('span');
+                        roleBadge.className = 'role-badge';
+                        if (isAdmin) {
+                            roleBadge.textContent = '管理者';
+                            roleBadge.classList.add('bg-purple-200', 'text-purple-800');
+                            adminControls.classList.remove('hidden');
+                            
+                            const usersCol = collection(db, 'users');
+                            const userSnapshot = await getDocs(usersCol);
+                            userSwitcher.innerHTML = '<option value="">他のユーザーのプランを見る</option>';
+                            userSnapshot.forEach(doc => {
+                                const uData = doc.data();
+                                const option = document.createElement('option');
+                                option.value = doc.id;
+                                option.textContent = uData.displayName || uData.email || doc.id;
+                                userSwitcher.appendChild(option);
+                            });
+                            listenForSubmissions();
+                            listenForImageReports();
+                        } else {
+                            roleBadge.textContent = '一般';
+                            roleBadge.classList.add('bg-green-200', 'text-green-800');
+                            adminControls.classList.add('hidden');
+                        }
+                        nameContainer.appendChild(roleBadge);
+                    })
+                    .catch((error) => {
+                        console.log("カスタムクレームの確認中にエラー（一般ユーザーの場合は正常）:", error.message);
+                        adminControls.classList.add('hidden');
+                    });
+
+                if (unsubscribeFavorites) unsubscribeFavorites();
+                const favDocRef = doc(db, "favorites", user.uid);
+                unsubscribeFavorites = onSnapshot(favDocRef, (docSnap) => {
+                    localFavorites = docSnap.exists() ? docSnap.data().spots || [] : [];
+                    renderAll();
+                });
+                
+                if (unsubscribeMailbox) unsubscribeMailbox();
+                if (unsubscribeAnnouncements) unsubscribeAnnouncements();
+                
+                let personalNotifications = [];
+                
+                const updateAndRenderMailbox = () => {
+                    const allNotifications = [...personalNotifications, ...localAnnouncements];
+                    allNotifications.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+                    let unreadCount = 0;
+                    const lastReadTimestamp = parseInt(localStorage.getItem('lastReadAnnouncementTimestamp') || '0', 10);
+
+                    personalNotifications.forEach(n => {
+                        if (!n.read) unreadCount++;
+                    });
+                    
+                    localAnnouncements.forEach(n => {
+                        if (n.createdAt && n.createdAt.toMillis() > lastReadTimestamp) {
+                            unreadCount++;
+                        }
+                    });
+
+                    mailboxBadge.textContent = unreadCount;
+                    mailboxBadge.classList.toggle('hidden', unreadCount === 0);
+                    renderMailbox(allNotifications, lastReadTimestamp);
+                };
+                
+                if (!user.isAnonymous) {
+                    const mailboxQuery = query(collection(db, "users", user.uid, "mailbox"));
+                    unsubscribeMailbox = onSnapshot(mailboxQuery, (snapshot) => {
+                        personalNotifications = snapshot.docs.map(d => ({...d.data(), id: d.id, type: 'personal'}));
+                        updateAndRenderMailbox();
+                    });
+                } else {
+                     mailboxBtn.classList.add('hidden');
+                }
+
+                const announcementsQuery = query(collection(db, "announcements"));
+                unsubscribeAnnouncements = onSnapshot(announcementsQuery, (snapshot) => {
+                    localAnnouncements = snapshot.docs.map(d => ({...d.data(), id: d.id, type: 'public'}));
+                    updateAndRenderMailbox();
+                });
+
+                viewUserPlan(user.uid, user.displayName || 'ゲスト');
+            }
+
+            async function viewUserPlan(userId, userName) {
+                if (unsubscribePlan) unsubscribePlan();
+                
+                viewedUserId = userId;
+                
+                const isViewingOwnPlan = currentUser.uid === viewedUserId;
+                myPlanTitle.textContent = isViewingOwnPlan ? 'マイプラン' : `${userName}のプラン`;
+                planControls.style.display = isViewingOwnPlan ? 'block' : 'none';
+
+                const planDocRef = doc(db, "plans", viewedUserId);
+                unsubscribePlan = onSnapshot(planDocRef, (docSnap) => {
+                    localPlan = docSnap.exists() ? docSnap.data().spots || [] : [];
+                    renderAll();
+                }, (error) => {
+                    console.error("プランの読み込みエラー:", error);
+                    if (error.code === 'permission-denied') {
+                         planItemsList.innerHTML = `<p class="text-red-500 text-center py-10">このユーザーのプランを閲覧する権限がありません。</p>`;
+                    }
+                });
+            }
+            
+            async function toggleFavorite(spotName) {
+                if (!currentUser) return;
+                const favDocRef = doc(db, "favorites", currentUser.uid);
+                const newFavorites = localFavorites.includes(spotName)
+                    ? localFavorites.filter(name => name !== spotName)
+                    : [...localFavorites, spotName];
+                await setDoc(favDocRef, { spots: newFavorites }, { merge: true });
+            }
+            
+            async function _addSpotToPlan(spotName) {
+                if (!currentUser || viewedUserId !== currentUser.uid) return;
+                if (localPlan.includes(spotName)) return;
+                const planDocRef = doc(db, "plans", currentUser.uid);
+                const newPlan = [...localPlan, spotName];
+                await setDoc(planDocRef, { spots: newPlan }, { merge: true });
+            }
+
+            async function addToPlan(spotName) {
+                if (!currentUser || viewedUserId !== currentUser.uid) return;
+                if (localPlan.includes(spotName)) return;
+
+                const spotToAdd = combinedSpots.find(s => s.name === spotName);
+
+                if (!spotToAdd) return;
+
+                if (localPlan.length > 0) {
+                    const firstSpotInPlan = combinedSpots.find(s => s.name === localPlan[0]);
+                    if (firstSpotInPlan && firstSpotInPlan.prefecture !== spotToAdd.prefecture) {
+                        showCrossPrefectureConfirmation(spotToAdd, firstSpotInPlan);
+                    } else {
+                        _addSpotToPlan(spotName);
+                    }
+                } else {
+                    _addSpotToPlan(spotName);
+                }
+            };
+
+            async function removeFromPlan(spotName) {
+                if (!currentUser || viewedUserId !== currentUser.uid) return;
+                const planDocRef = doc(db, "plans", currentUser.uid);
+                const newPlan = localPlan.filter(name => name !== spotName);
+                await setDoc(planDocRef, { spots: newPlan });
+            };
+            
+            async function savePlanOrder(newPlanOrder) {
+                if (!currentUser || viewedUserId !== currentUser.uid) return;
+                const planDocRef = doc(db, "plans", currentUser.uid);
+                await setDoc(planDocRef, { spots: newPlanOrder });
+            }
+
+            async function clearPlan() {
+                if (!currentUser || viewedUserId !== currentUser.uid) return;
+                const planDocRef = doc(db, "plans", currentUser.uid);
+                await setDoc(planDocRef, { spots: [] });
+            }
+
+            function createCard(spot) {
+                const card = document.createElement('div');
+                card.className = 'card bg-white rounded-xl shadow-md overflow-hidden flex flex-col relative';
+                
+                const isFavorited = localFavorites.includes(spot.name);
+                const isInPlan = localPlan.includes(spot.name);
+                
+                card.innerHTML = `
+                    <div class="absolute top-0 right-0 p-2 z-10 flex flex-col items-end gap-2">
+                        <div class="favorite-btn ${isFavorited ? 'favorited' : ''}" title="お気に入りに追加">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="card-content p-5 pt-3 flex flex-col flex-grow">
+                        <div class="flex-grow">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="inline-block px-3 py-1 text-xs font-semibold rounded-full ${spot.category === '観光' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'}">${spot.category}</span>
+                                <span class="inline-block px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">${spot.subCategory}</span>
+                            </div>
+                            <p class="text-sm font-semibold text-gray-500 mb-1">${spot.prefecture}・${spot.area}</p>
+                            <h3 class="text-xl font-bold text-gray-800 mb-2">${spot.name}</h3>
+                            <div class="flex flex-wrap gap-1 mb-3">
+                                ${spot.tags ? spot.tags.map(tag => `<span class="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">#${tag}</span>`).join('') : ''}
+                            </div>
+                            <p class="text-gray-600 text-sm line-clamp-3">${spot.description}</p>
+                        </div>
+                        <div class="mt-4 flex-shrink-0">
+                            <button class="add-to-plan-btn w-full py-2 px-4 rounded-lg font-semibold text-sm transition-colors duration-200 ${isInPlan ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}">
+                                ${isInPlan ? '✓ プランに追加済み' : '+ プランに追加'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                card.querySelector('.card-content').addEventListener('click', (e) => {
+                   if (!e.target.closest('.add-to-plan-btn')) openModal(spot);
+                });
+
+                card.querySelector('.favorite-btn').addEventListener('click', () => toggleFavorite(spot.name));
+                const addToPlanBtn = card.querySelector('.add-to-plan-btn');
+                if (!isInPlan) {
+                    addToPlanBtn.addEventListener('click', () => addToPlan(spot.name));
+                }
+                
+                return card;
+            }
+
+            function renderSpots() {
+                spotsList.innerHTML = '';
+                let sourceSpots = combinedSpots;
+
+                if (currentPrefecture !== 'all') {
+                    sourceSpots = sourceSpots.filter(spot => spot.prefecture.includes(prefectureFilter.options[prefectureFilter.selectedIndex].text.replace(/[都府県]/, '')));
+                }
+                
+                if (currentFilters.category === 'favorites') {
+                    sourceSpots = sourceSpots.filter(spot => localFavorites.includes(spot.name));
+                }
+
+                const filteredSpots = sourceSpots.filter(spot => {
+                    const categoryMatch = currentFilters.category === 'all' || currentFilters.category === 'favorites' || spot.category === currentFilters.category;
+                    const areaMatch = currentFilters.area === 'all' || spot.area === currentFilters.area;
+                    const tagMatch = currentFilters.tag === 'all' || (spot.tags && spot.tags.includes(currentFilters.tag));
+                    return categoryMatch && areaMatch && tagMatch;
+                });
+                
+                if (filteredSpots.length > 0) {
+                    filteredSpots.forEach(spot => spotsList.appendChild(createCard(spot)));
+                } else {
+                    spotsList.innerHTML = `<p class="col-span-full text-center text-gray-500 py-10">該当するスポットはありません。</p>`;
+                }
+                updateListTitle();
+            }
+            
+            function updateListTitle() {
+                let titleText = '';
+                if (currentFilters.area !== 'all') titleText += `${currentFilters.area}の`;
+                
+                if (currentFilters.category === 'favorites') titleText += 'お気に入り';
+                else if (currentFilters.category !== 'all') titleText += `${currentFilters.category}`;
+                else titleText += 'すべての';
+
+                if (currentFilters.tag !== 'all') titleText += ` #${currentFilters.tag}`;
+
+                titleText += 'スポット';
+                listTitle.textContent = titleText;
+            }
+
+            function renderAreaMap() {
+                const positions = areaPositions[currentPrefecture];
+                mapContainer.innerHTML = '';
+
+                if (!positions || positions.length === 0) {
+                    mapContainer.innerHTML = `<p class="text-center text-gray-500 py-10">この都道府県のエリアマップは<br>現在準備中です。</p>`;
+                    return;
+                }
+
+                const mapLine = document.createElement('div');
+                if (currentPrefecture === 'tokyo') {
+                    mapLine.className = 'yamanote-line';
+                } else if (currentPrefecture === 'osaka') {
+                    mapLine.className = 'osaka-loop-line';
+                }
+                mapContainer.appendChild(mapLine);
+
+                const allBtn = document.createElement('button');
+                allBtn.dataset.area = 'all';
+                allBtn.textContent = '全エリア';
+                allBtn.className = `map-area-button ${currentPrefecture}`;
+                allBtn.style.top = '50%';
+                allBtn.style.left = '50%';
+                if (currentFilters.area === 'all') allBtn.classList.add('active');
+                mapContainer.appendChild(allBtn);
+
+                positions.forEach(area => {
+                    const button = document.createElement('button');
+                    button.dataset.area = area.name;
+                    button.textContent = area.name;
+                    button.className = `map-area-button ${currentPrefecture}`;
+                    button.style.top = area.top;
+                    button.style.left = area.left;
+                    if (currentFilters.area === area.name) button.classList.add('active');
+                    mapContainer.appendChild(button);
+                });
+            }
+
+            function renderAreaList() {
+                const positions = areaPositions[currentPrefecture];
+                areaListContainer.innerHTML = '';
+
+                if (!positions || positions.length === 0) {
+                    areaListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">この都道府県のエリアリストは<br>現在準備中です。</p>`;
+                    return;
+                }
+
+                const allBtn = document.createElement('button');
+                allBtn.dataset.area = 'all';
+                allBtn.textContent = '全エリア';
+                allBtn.className = 'tag-btn';
+                if (currentFilters.area === 'all') allBtn.classList.add('active');
+                areaListContainer.appendChild(allBtn);
+
+                positions.forEach(area => {
+                    const button = document.createElement('button');
+                    button.dataset.area = area.name;
+                    button.textContent = area.name;
+                    button.className = 'tag-btn';
+                    if (currentFilters.area === area.name) button.classList.add('active');
+                    areaListContainer.appendChild(button);
+                });
+            }
+
+            function renderAreaFilterContent() {
+                areaViewSwitcher.querySelectorAll('button').forEach(btn => {
+                    btn.classList.toggle('active-filter', btn.dataset.view === areaFilterView);
+                });
+
+                if (areaFilterView === 'map') {
+                    mapContainer.classList.remove('hidden');
+                    areaListContainer.classList.add('hidden');
+                    renderAreaMap();
+                } else { // 'list'
+                    mapContainer.classList.add('hidden');
+                    areaListContainer.classList.remove('hidden');
+                    renderAreaList();
+                }
+            }
+
+            function renderTags() {
+                tagFilters.innerHTML = `<button data-filter="all" class="tag-btn">すべてのタグ</button>`;
+                standardTags.forEach(tag => {
+                    const button = document.createElement('button');
+                    button.dataset.filter = tag;
+                    button.textContent = `#${tag}`;
+                    button.className = 'tag-btn';
+                    if (currentFilters.tag === tag) button.classList.add('active');
+                    tagFilters.appendChild(button);
+                });
+            }
+
+            function getTransitTime(area1, area2, prefecture) {
+                if (area1 === area2) return 0;
+                const transitMatrix = allTransitData[prefecture];
+                if (!transitMatrix) return 25; // Default if no data
+
+                if (transitMatrix[area1] && transitMatrix[area1][area2] !== undefined) {
+                    return transitMatrix[area1][area2];
+                }
+                if (transitMatrix[area2] && transitMatrix[area2][area1] !== undefined) {
+                    return transitMatrix[area2][area1];
+                }
+                return 25; // Default transit time
+            }
+
+            function parseStayTime(timeString) {
+                if (!timeString) return 0;
+                const numbers = timeString.match(/\d+/g)?.map(Number) || [];
+                if (numbers.length === 0) return 0;
+                
+                let totalMinutes = 0;
+                if (timeString.includes('-')) { // Handle ranges like "90-120分"
+                    totalMinutes = (numbers[0] + numbers[1]) / 2;
+                } else {
+                    totalMinutes = numbers[0];
+                }
+
+                if (timeString.includes('時間')) {
+                    totalMinutes *= 60;
+                    if (numbers.length > 1 && timeString.includes('分')) { // Handle "X時間Y分"
+                        totalMinutes += numbers[1];
+                    }
+                }
+                return totalMinutes;
+            }
+
+            function generateGoogleMapsRouteUrl() {
+                const plan = localPlan;
+
+                if (plan.length === 1) {
+                    const spot = combinedSpots.find(s => s.name === plan[0]);
+                    return spot ? spot.gmaps : '#';
+                }
+                
+                if (plan.length < 2) return '#';
+
+                const baseUrl = 'https://www.google.com/maps/dir/';
+                const waypoints = plan.map(spotName => {
+                    const spot = combinedSpots.find(s => s.name === spotName);
+                    if (!spot) return null;
+                    try {
+                        const url = new URL(spot.gmaps);
+                        const query = url.searchParams.get('query');
+                        return encodeURIComponent(query || spot.name);
+                    } catch (e) {
+                        return encodeURIComponent(spot.name);
+                    }
+                }).filter(Boolean);
+
+                return baseUrl + waypoints.join('/');
+            }
+
+            function renderPlan() {
+                const plan = localPlan;
+                planItemsList.innerHTML = '';
+                let totalMinutes = 0;
+                const isViewingOwnPlan = currentUser && currentUser.uid === viewedUserId;
+
+                if (plan.length === 0) {
+                    planItemsList.innerHTML = `<p class="text-gray-500 text-center py-10">${isViewingOwnPlan ? 'プランは空です。<br>気になるスポットを追加してみましょう！' : 'このユーザーのプランは空です。'}</p>`;
+                } else {
+                    plan.forEach((spotName, index) => {
+                        const spot = combinedSpots.find(s => s.name === spotName);
+                        if (!spot) return;
+                        
+                        totalMinutes += parseStayTime(spot.stayTime);
+                        
+                        const item = document.createElement('div');
+                        item.className = 'plan-item flex items-center bg-gray-50 p-3 rounded-lg shadow-sm';
+                        item.dataset.spotName = spot.name;
+                        
+                        item.innerHTML = `
+                            <span class="move-handle text-gray-400" ${isViewingOwnPlan ? 'draggable="true"': ''}>☰</span>
+                            <div class="flex-grow ml-2">
+                                <p class="font-bold text-gray-800">${spot.name}</p>
+                                <p class="text-sm text-gray-500">${spot.area} | ${spot.stayTime}</p>
+                            </div>
+                            <button class="remove-from-plan-btn text-red-500 hover:text-red-700 ml-4 p-1 rounded-full ${isViewingOwnPlan ? '' : 'hidden'}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                        `;
+                        planItemsList.appendChild(item);
+                        if (isViewingOwnPlan) {
+                           item.querySelector('.remove-from-plan-btn').addEventListener('click', () => removeFromPlan(spot.name));
+                        }
+
+                        if (index < plan.length - 1) {
+                            const nextSpotName = plan[index + 1];
+                            const nextSpot = combinedSpots.find(s => s.name === nextSpotName);
+                            const transitEl = document.createElement('div');
+                            transitEl.className = 'transit-time';
+
+                            if (nextSpot && spot.prefecture === nextSpot.prefecture) {
+                                const transitTime = getTransitTime(spot.area, nextSpot.area, spot.prefecture.replace(/[都府県]/, ''));
+                                totalMinutes += transitTime;
+                                transitEl.innerHTML = `
+                                    <div class="transit-time-icon">
+                                        <svg class="w-5 h-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v1.333a1 1 0 01-1.333 1.334h-1.334A2.667 2.667 0 006 8v5.333a2.667 2.667 0 002.667 2.667h1.334a1.333 1.333 0 110 2.666H8A5.333 5.333 0 012.667 13.333V8a5.333 5.333 0 015.333-5.333h.001zm4.667 1.333a1 1 0 10-1.334-1.333A2.667 2.667 0 0010.667 4v1.333a2.667 2.667 0 002.666 2.667h1.334a1.333 1.333 0 100-2.667h-1.334A1 1 0 0114.667 4.333z" clip-rule="evenodd" /></svg>
+                                    </div>
+                                    <span class="text-sm font-semibold text-gray-600">移動: 約${transitTime}分</span>
+                                `;
+                            } else {
+                                 transitEl.innerHTML = `
+                                    <div class="transit-time-icon">
+                                        <svg class="w-5 h-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                    </div>
+                                    <span class="text-xs font-semibold text-yellow-600">他県のため移動時間は計算されません</span>
+                                 `;
+                            }
+                            planItemsList.appendChild(transitEl);
+                        }
+                    });
+                }
+                
+                planCountBadge.textContent = plan.length;
+                planCountBadge.classList.toggle('hidden', plan.length === 0);
+
+                const hours = Math.floor(totalMinutes / 60);
+                const minutes = totalMinutes % 60;
+                planTotalTimeEl.textContent = `${hours > 0 ? hours + '時間' : ''} ${minutes}分`;
+
+                const mapButtonsEnabled = plan.length > 0;
+                routeMapBtn.classList.toggle('opacity-50', !mapButtonsEnabled);
+                routeMapBtn.classList.toggle('cursor-not-allowed', !mapButtonsEnabled);
+                routeMapFromCurrentBtn.classList.toggle('opacity-50', !mapButtonsEnabled);
+                routeMapFromCurrentBtn.classList.toggle('cursor-not-allowed', !mapButtonsEnabled);
+
+                if (mapButtonsEnabled) {
+                    routeMapBtn.href = generateGoogleMapsRouteUrl();
+                } else {
+                    routeMapBtn.href = '#';
+                }
+            }
+
+            let draggedItem = null;
+            
+            function handleDragStart(e) {
+                if (viewedUserId !== currentUser.uid || !e.target.classList.contains('move-handle')) {
+                    e.preventDefault();
+                    return;
+                }
+                draggedItem = e.target.closest('.plan-item');
+                setTimeout(() => { if(draggedItem) draggedItem.classList.add('dragging'); }, 0);
+            }
+
+            function handleDragOver(e) {
+                if (viewedUserId !== currentUser.uid) return;
+                e.preventDefault();
+                const afterElement = getDragAfterElement(planItemsList, e.clientY);
+                const currentDragged = document.querySelector('.dragging');
+                if (!currentDragged) return;
+                if (afterElement == null) {
+                    planItemsList.appendChild(currentDragged);
+                } else {
+                    planItemsList.insertBefore(currentDragged, afterElement);
+                }
+            }
+            
+            function handleDrop(e) {
+                e.preventDefault();
+                if (!draggedItem) return;
+                draggedItem.classList.remove('dragging');
+                const newPlanOrder = [...planItemsList.querySelectorAll('.plan-item')].map(item => item.dataset.spotName);
+                
+                localPlan = newPlanOrder;
+                renderPlan();
+                
+                savePlanOrder(newPlanOrder);
+                draggedItem = null;
+            }
+
+            function handleTouchStart(e) {
+                if (viewedUserId !== currentUser.uid || !e.target.classList.contains('move-handle')) {
+                    return;
+                }
+                e.preventDefault();
+                draggedItem = e.target.closest('.plan-item');
+                if (draggedItem) {
+                    draggedItem.classList.add('dragging');
+                }
+            }
+
+            function handleTouchMove(e) {
+                if (!draggedItem) return;
+                e.preventDefault();
+                const touch = e.touches[0];
+                const afterElement = getDragAfterElement(planItemsList, touch.clientY);
+                if (afterElement == null) {
+                    planItemsList.appendChild(draggedItem);
+                } else {
+                    planItemsList.insertBefore(draggedItem, afterElement);
+                }
+            }
+
+            function handleTouchEnd(e) {
+                if (!draggedItem) return;
+                draggedItem.classList.remove('dragging');
+                const newPlanOrder = [...planItemsList.querySelectorAll('.plan-item')].map(item => item.dataset.spotName);
+                
+                localPlan = newPlanOrder;
+                renderPlan();
+
+                savePlanOrder(newPlanOrder);
+                draggedItem = null;
+            }
+
+            planItemsList.addEventListener('dragstart', handleDragStart);
+            planItemsList.addEventListener('dragover', handleDragOver);
+            planItemsList.addEventListener('drop', handleDrop);
+            planItemsList.addEventListener('dragend', (e) => {
+                if (draggedItem) {
+                    draggedItem.classList.remove('dragging');
+                }
+                draggedItem = null;
+            });
+            planItemsList.addEventListener('touchstart', handleTouchStart, { passive: false });
+            planItemsList.addEventListener('touchmove', handleTouchMove, { passive: false });
+            planItemsList.addEventListener('touchend', handleTouchEnd);
+
+
+            function getDragAfterElement(container, y) {
+                const draggableElements = [...container.querySelectorAll('.plan-item:not(.dragging)')];
+                return draggableElements.reduce((closest, child) => {
+                    const box = child.getBoundingClientRect();
+                    const offset = y - box.top - box.height / 2;
+                    if (offset < 0 && offset > closest.offset) {
+                        return { offset: offset, element: child };
+                    } else {
+                        return closest;
+                    }
+                }, { offset: Number.NEGATIVE_INFINITY }).element;
+            }
+
+            async function openModal(spot) {
+                modal.dataset.spotName = spot.name;
+                document.getElementById('modal-title').textContent = spot.name;
+                document.getElementById('modal-description').innerHTML = spot.description;
+                document.getElementById('modal-stay-time').textContent = `平均滞在時間: ${spot.stayTime}`;
+                const modalImage = document.getElementById('modal-image');
+                const modalImageSource = document.getElementById('modal-image-source');
+
+                modalImage.src = spot.image || 'https://placehold.co/600x400/E57373/FFF?text=Image+Not+Found';
+                
+                if (spot.imageSourceUrl && spot.imageSource) {
+                    modalImageSource.href = spot.imageSourceUrl;
+                    modalImageSource.textContent = `画像引用元: ${spot.imageSource}`;
+                    modalImageSource.classList.remove('hidden');
+                } else {
+                    modalImageSource.classList.add('hidden');
+                }
+
+                modalImage.onload = () => {
+                    modalImageSpinner.classList.add('hidden');
+                    modalImage.classList.remove('hidden');
+                };
+                modalImage.onerror = () => {
+                    modalImage.src = 'https://placehold.co/600x400/E57373/FFF?text=Image+Not+Found';
+                    modalImageSpinner.classList.add('hidden');
+                    modalImage.classList.remove('hidden');
+                };
+
+                const modalTagsContainer = document.getElementById('modal-tags');
+                modalTagsContainer.innerHTML = '';
+                 if (spot.tags) {
+                       spot.tags.forEach(tag => {
+                           const tagEl = document.createElement('span');
+                           tagEl.className = 'text-sm bg-teal-100 text-teal-800 px-3 py-1 rounded-full';
+                           tagEl.textContent = `#${tag}`;
+                           modalTagsContainer.appendChild(tagEl);
+                       });
+               }
+
+                const modalWebsite = document.getElementById('modal-website');
+                const modalMap = document.getElementById('modal-map');
+                modalMap.href = spot.gmaps;
+
+                if (spot.website && spot.website !== '#') {
+                    modalWebsite.href = spot.website;
+                    modalWebsite.classList.remove('hidden');
+                } else {
+                    modalWebsite.classList.add('hidden');
+                }
+
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    modalContent.classList.remove('opacity-0', '-translate-y-12');
+                }, 10);
+            }
+            
+            function closeModal() {
+                modal.classList.add('opacity-0');
+                modalContent.classList.add('opacity-0', '-translate-y-12');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            }
+
+            function showConfirmationModal(message, actionButtonText, buttonClass, onConfirm) {
+                confirmationMessage.innerHTML = message.replace(/\n/g, '<br>'); // Support newlines
+                confirmActionBtn.textContent = actionButtonText;
+
+                confirmActionBtn.className = `py-2 px-6 text-white rounded-lg font-semibold transition-colors ${buttonClass} hover:${buttonClass.replace('500', '600')}`;
+
+                confirmationOverlay.classList.add('visible');
+
+                confirmActionBtn.onclick = () => {
+                    onConfirm();
+                    confirmationOverlay.classList.remove('visible');
+                };
+            }
+
+            function showCrossPrefectureConfirmation(spotToAdd, firstSpotInPlan) {
+                crossPrefectureMessage.innerHTML = `「${firstSpotInPlan.prefecture}」のプランに「${spotToAdd.prefecture}」のスポットを追加しようとしています。<br>移動時間が正しく計算されませんが、よろしいですか？`;
+                crossPrefectureOverlay.classList.add('visible');
+
+                const closeOverlay = () => {
+                    crossPrefectureOverlay.classList.remove('visible');
+                    crossPrefectureAddBtn.onclick = null;
+                    crossPrefectureFavoriteBtn.onclick = null;
+                    crossPrefectureCancelBtn.onclick = null;
+                }
+
+                crossPrefectureAddBtn.onclick = () => {
+                    _addSpotToPlan(spotToAdd.name);
+                    closeOverlay();
+                };
+                crossPrefectureFavoriteBtn.onclick = () => {
+                    toggleFavorite(spotToAdd.name);
+                    showInfoModal(`「${spotToAdd.name}」をお気に入りに追加しました。`);
+                    closeOverlay();
+                };
+                crossPrefectureCancelBtn.onclick = closeOverlay;
+            }
+
+            authBtn.addEventListener('click', handleAuth);
+            guestLoginBtn.addEventListener('click', handleGuestLogin);
+            emailInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') authBtn.click(); });
+            passwordInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') authBtn.click(); });
+            confirmPasswordInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') authBtn.click(); });
+            authSwitchLink.addEventListener('click', (e) => { e.preventDefault(); toggleAuthMode(); });
+            logoutBtnSettings.addEventListener('click', handleLogout);
+
+            prefectureFilter.addEventListener('change', (e) => {
+                currentPrefecture = e.target.value;
+                currentFilters.area = 'all'; 
+                
+                if (currentPrefecture === 'all' || !areaPositions[currentPrefecture] || areaPositions[currentPrefecture].length === 0) {
+                    openAreaFilterBtn.disabled = true;
+                } else {
+                    openAreaFilterBtn.disabled = false;
+                }
+                
+                renderSpots();
+            });
+
+            categoryFilters.addEventListener('click', (e) => {
+                const button = e.target.closest('.filter-btn');
+                if (button) {
+                    currentFilters.category = button.dataset.filter;
+                    categoryFilters.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active-filter'));
+                    button.classList.add('active-filter');
+                    renderSpots();
+                }
+            });
+            
+            openAreaFilterBtn.addEventListener('click', () => {
+                renderAreaFilterContent();
+                areaFilterOverlay.classList.add('visible');
+            });
+            closeAreaFilterBtn.addEventListener('click', () => areaFilterOverlay.classList.remove('visible'));
+            
+            areaViewSwitcher.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (button && button.dataset.view) {
+                    areaFilterView = button.dataset.view;
+                    renderAreaFilterContent();
+                }
+            });
+
+            areaListContainer.addEventListener('click', (e) => {
+                const button = e.target.closest('.tag-btn');
+                if (button) {
+                    currentFilters.area = button.dataset.area;
+                    renderSpots();
+                    areaFilterOverlay.classList.remove('visible');
+                }
+            });
+
+            mapContainer.addEventListener('click', (e) => {
+                const button = e.target.closest('.map-area-button');
+                if (button) {
+                    currentFilters.area = button.dataset.area;
+                    renderSpots();
+                    areaFilterOverlay.classList.remove('visible');
+                }
+            });
+            
+            openTagFilterBtn.addEventListener('click', () => {
+                renderTags();
+                tagFilterOverlay.classList.add('visible');
+            });
+            closeTagFilterBtn.addEventListener('click', () => tagFilterOverlay.classList.remove('visible'));
+
+            tagFilters.addEventListener('click', (e) => {
+                const button = e.target.closest('.tag-btn');
+                if (button) {
+                    currentFilters.tag = button.dataset.filter;
+                    renderSpots();
+                    tagFilterOverlay.classList.remove('visible');
+                }
+            });
+
+            modalClose.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
+            
+            myPlanBtn.addEventListener('click', () => {
+                document.body.classList.add('overflow-hidden');
+                myPlanPanelOverlay.classList.remove('hidden');
+                myPlanPanel.classList.remove('translate-x-full');
+            });
+            const closePlanPanel = () => {
+                document.body.classList.remove('overflow-hidden');
+                myPlanPanel.classList.add('translate-x-full');
+                myPlanPanelOverlay.classList.add('hidden');
+            };
+            myPlanCloseBtn.addEventListener('click', closePlanPanel);
+            myPlanPanelOverlay.addEventListener('click', closePlanPanel);
+
+            clearPlanBtn.addEventListener('click', () => {
+                showConfirmationModal('本当にすべてのプランを削除しますか？', '削除', 'bg-red-500', clearPlan);
+            });
+
+            confirmCancelBtn.addEventListener('click', () => confirmationOverlay.classList.remove('visible'));
+            confirmationOverlay.addEventListener('click', (e) => {
+                if (e.target === confirmationOverlay) confirmationOverlay.classList.remove('visible');
+            });
+
+            copyPlanBtn.addEventListener('click', () => {
+                const plan = localPlan;
+                if (plan.length === 0) return;
+
+                let planText = `【${currentUser.isAnonymous ? 'ゲスト' : currentUser.displayName}さんのVLOG旅プラン】\n`;
+                let totalMinutes = 0;
+                
+                plan.forEach((spotName, index) => {
+                    const spot = combinedSpots.find(s => s.name === spotName);
+                    if (!spot) return;
+
+                    const stayTime = parseStayTime(spot.stayTime);
+                    totalMinutes += stayTime;
+                    planText += `\n📍 ${index + 1}. ${spot.name}\n`;
+                    planText += `   (滞在: ${spot.stayTime})\n`;
+
+                    if (index < plan.length - 1) {
+                        const nextSpot = combinedSpots.find(s => s.name === plan[index + 1]);
+                        if (nextSpot && spot.prefecture === nextSpot.prefecture) {
+                            const transitTime = getTransitTime(spot.area, nextSpot.area, spot.prefecture.replace(/[都府県]/, ''));
+                            totalMinutes += transitTime;
+                            planText += `   ⬇️\n   (移動: 約${transitTime}分)\n`;
+                        } else {
+                            planText += `   ⬇️\n   (他県への移動)\n`;
+                        }
+                    }
+                });
+
+                const hours = Math.floor(totalMinutes / 60);
+                const minutes = totalMinutes % 60;
+                const totalTimeText = `${hours > 0 ? hours + '時間' : ''}${minutes}分`;
+
+                planText += `\n--------------------\n`;
+                planText += `合計目安時間: ${totalTimeText} (移動時間込み)`;
+
+                copyTextarea.value = planText;
+                copyTextarea.select();
+                document.execCommand('copy');
+
+                const originalText = copyPlanBtn.textContent;
+                copyPlanBtn.textContent = 'コピーしました！';
+                copyPlanBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                copyPlanBtn.classList.remove('bg-teal-500', 'hover:bg-teal-600');
+                
+                setTimeout(() => {
+                    copyPlanBtn.textContent = originalText;
+                    copyPlanBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                    copyPlanBtn.classList.add('bg-teal-500', 'hover:bg-teal-600');
+                }, 2000);
+            });
+            
+            routeMapFromCurrentBtn.addEventListener('click', () => {
+                if (localPlan.length === 0) {
+                    showInfoModal("プランにスポットがありません。");
+                    return;
+                }
+                if (!navigator.geolocation) {
+                    showInfoModal("お使いのブラウザは位置情報機能に対応していません。");
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        const baseUrl = 'https://www.google.com/maps/dir/';
+                        const origin = `${latitude},${longitude}`;
+                        const waypoints = localPlan.map(spotName => {
+                            const spot = combinedSpots.find(s => s.name === spotName);
+                            if (!spot) return null;
+                            try {
+                                const url = new URL(spot.gmaps);
+                                return encodeURIComponent(url.searchParams.get('query') || spot.name);
+                            } catch (e) {
+                                return encodeURIComponent(spot.name);
+                            }
+                        }).filter(Boolean);
+
+                        const finalUrl = baseUrl + origin + '/' + waypoints.join('/');
+                        window.open(finalUrl, '_blank');
+                    },
+                    (error) => {
+                        showInfoModal("位置情報を取得できませんでした。ブラウザの設定を確認してください。");
+                        console.error("Geolocation error:", error);
+                    }
+                );
+            });
+
+            const eyeIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`;
+            const eyeSlashIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7 1.274-4.057 5.064 7 9.542 7 .847 0 1.673.124 2.468.352M15 12a3 3 0 11-6 0 3 3 0 016 0zm6 0a9.953 9.953 0 01-1.043 4.125M1.957 5.957A9.953 9.953 0 013 5m18 0l-2.675 2.675M3 3l18 18"></path></svg>`;
+            
+            passwordToggle.innerHTML = eyeIcon;
+            confirmPasswordToggle.innerHTML = eyeIcon;
+
+            function setupPasswordToggle(toggleBtn, inputEl) {
+                 toggleBtn.addEventListener('click', () => {
+                     const type = inputEl.getAttribute('type') === 'password' ? 'text' : 'password';
+                     inputEl.setAttribute('type', type);
+                     toggleBtn.innerHTML = type === 'password' ? eyeIcon : eyeSlashIcon;
+                 });
+            }
+            
+            setupPasswordToggle(passwordToggle, passwordInput);
+            setupPasswordToggle(confirmPasswordToggle, confirmPasswordInput);
+
+            userSettingsBtn.addEventListener('click', async () => {
+                if (!currentUser) return;
+                
+                if (currentUser.isAnonymous) {
+                    settingsIconSection.classList.add('hidden');
+                    settingsUsernameSection.classList.add('hidden');
+                    settingsEmailSection.classList.add('hidden');
+                    saveSettingsBtn.classList.add('hidden');
+                } else {
+                    const userDocRef = doc(db, "users", currentUser.uid);
+                    const userDocSnap = await getDoc(userDocRef);
+                    const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+
+                    settingsIconSection.classList.remove('hidden');
+                    settingsUsernameSection.classList.remove('hidden');
+                    settingsEmailSection.classList.remove('hidden');
+                    saveSettingsBtn.classList.remove('hidden');
+
+                    settingsUsernameInput.value = currentUser.displayName || '';
+                    settingsEmail.textContent = currentUser.email || 'N/A';
+                    settingsIconPreview.src = currentUser.photoURL || 'https://placehold.co/40x40/D35400/FFF?text=👤';
+                }
+                userSettingsOverlay.classList.add('visible');
+            });
+            closeUserSettingsBtn.addEventListener('click', () => userSettingsOverlay.classList.remove('visible'));
+            
+            saveSettingsBtn.addEventListener('click', async () => {
+                const newDisplayName = settingsUsernameInput.value.trim();
+
+                try {
+                    if (newDisplayName && newDisplayName !== currentUser.displayName) {
+                        await updateProfile(currentUser, { displayName: newDisplayName });
+                        const userDocRef = doc(db, "users", currentUser.uid);
+                        await updateDoc(userDocRef, { displayName: newDisplayName });
+                    }
+                    
+                    showInfoModal("設定を保存しました。");
+                    userSettingsOverlay.classList.remove('visible');
+                    initAppForUser(currentUser); 
+                } catch (error) {
+                    showInfoModal("設定の保存に失敗しました。");
+                    console.error("Settings save error:", error);
+                }
+            });
+            
+            iconUploadBtn.addEventListener('click', () => iconUploadInput.click());
+            
+            iconUploadInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    cropperImage.src = event.target.result;
+                    cropperOverlay.classList.add('visible');
+                    
+                    if (cropper) {
+                        cropper.destroy();
+                    }
+                    
+                    cropper = new Cropper(cropperImage, {
+                        aspectRatio: 1,
+                        viewMode: 1,
+                        background: false,
+                        autoCropArea: 0.8,
+                    });
+                };
+                reader.readAsDataURL(file);
+                iconUploadInput.value = ''; 
+            });
+
+            cropperCancelBtn.addEventListener('click', () => {
+                cropperOverlay.classList.remove('visible');
+                if(cropper) cropper.destroy();
+            });
+
+            cropperSaveBtn.addEventListener('click', async () => {
+                if (!cropper || !currentUser) return;
+
+                iconUploadSpinner.classList.remove('hidden');
+                cropperSaveBtn.disabled = true;
+
+                cropper.getCroppedCanvas({
+                    width: 256,
+                    height: 256,
+                    imageSmoothingQuality: 'high',
+                }).toBlob(async (blob) => {
+                    const storageRef = ref(storage, `profile_icons/${currentUser.uid}`);
+                    
+                    try {
+                        const snapshot = await uploadBytes(storageRef, blob);
+                        const downloadURL = await getDownloadURL(snapshot.ref);
+
+                        await updateProfile(currentUser, { photoURL: downloadURL });
+                        await updateDoc(doc(db, "users", currentUser.uid), { photoURL: downloadURL });
+
+                        showInfoModal("アイコンを更新しました。");
+                        initAppForUser(currentUser); 
+                    } catch (error) {
+                        console.error("Icon upload error: ", error);
+                        showInfoModal("アイコンのアップロードに失敗しました。");
+                    } finally {
+                        iconUploadSpinner.classList.add('hidden');
+                        cropperSaveBtn.disabled = false;
+                        cropperOverlay.classList.remove('visible');
+                        if(cropper) cropper.destroy();
+                    }
+                }, 'image/png');
+            });
+
+
+            userSwitcher.addEventListener('change', (e) => {
+                const selectedUserId = e.target.value;
+                if (selectedUserId) {
+                    const selectedUserName = e.target.options[e.target.selectedIndex].text;
+                    viewUserPlan(selectedUserId, selectedUserName);
+                } else {
+                    viewUserPlan(currentUser.uid, currentUser.displayName || 'ゲスト');
+                }
+            });
+
+            addSpotBtn.addEventListener('click', () => {
+                addSpotOverlay.classList.add('visible');
+            });
+            closeAddSpotBtn.addEventListener('click', () => {
+                addSpotOverlay.classList.remove('visible');
+            });
+            submitSpotBtn.addEventListener('click', async () => {
+                const spotName = newSpotName.value.trim();
+                const spotUrl = newSpotUrl.value.trim();
+
+                if (!spotName || !spotUrl) {
+                    showInfoModal("スポット名とURLの両方を入力してください。");
+                    return;
+                }
+                if (spotName.length < 3) {
+                    showInfoModal("スポット名は3文字以上で入力してください。");
+                    return;
+                }
+                try {
+                    new URL(spotUrl);
+                } catch (_) {
+                    showInfoModal("有効なURLを入力してください。");
+                    return;
+                }
+                if (!currentUser) {
+                    showInfoModal("ログインが必要です。");
+                    return;
+                }
+                if (combinedSpots.some(spot => spot.name === spotName)) {
+                    showInfoModal("このスポットは既に登録されています。");
+                    return;
+                }
+
+                submitSpotSpinner.classList.remove('hidden');
+                submitSpotBtn.disabled = true;
+                
+                try {
+                    const analyzeSpotSuggestion = httpsCallable(functions, 'analyzeSpotSuggestion');
+                    const result = await analyzeSpotSuggestion({
+                        spotName: spotName,
+                        spotUrl: spotUrl,
+                        areaPositions: areaPositions,
+                        standardTags: standardTags
+                    });
+                    
+                    const aiData = result.data;
+
+                    if (!aiData.isNameConsistent) {
+                        showInfoModal("提案されたスポット名と公式サイトの内容が一致しないようです。");
+                        submitSpotSpinner.classList.add('hidden');
+                        submitSpotBtn.disabled = false;
+                        return;
+                    }
+                    if (!aiData.prefecture || !supportedPrefectureNames.includes(aiData.prefecture)) {
+                        pendingReAnalysisData = { ...aiData, originalName: spotName, originalUrl: spotUrl };
+                        reAnalysisOverlay.classList.add('visible');
+                        submitSpotSpinner.classList.add('hidden');
+                        submitSpotBtn.disabled = false;
+                        return; 
+                    }
+
+                    await addDoc(collection(db, "spot_submissions"), {
+                        ...aiData,
+                        originalName: spotName,
+                        originalUrl: spotUrl,
+                        submittedBy: currentUser.uid,
+                        submittedAt: serverTimestamp(),
+                        status: "pending"
+                    });
+
+                    showInfoModal("スポットの提案を送信しました。管理者の承認をお待ちください。");
+                    newSpotName.value = '';
+                    newSpotUrl.value = '';
+                    addSpotOverlay.classList.remove('visible');
+
+                } catch (error) {
+                    console.error("AI分析または提案の送信に失敗しました:", error);
+                    showInfoModal(`エラーが発生しました: ${error.message}`);
+                } finally {
+                    submitSpotSpinner.classList.add('hidden');
+                    submitSpotBtn.disabled = false;
+                }
+            });
+            
+            closeReAnalysisBtn.addEventListener('click', () => reAnalysisOverlay.classList.remove('visible'));
+            
+            reSubmitSpotBtn.addEventListener('click', async () => {
+                 const gmapsUrl = reAnalysisGmapsUrl.value.trim();
+                 if (!gmapsUrl) {
+                     showInfoModal("GoogleマップのURLを入力してください。");
+                     return;
+                 }
+                 reSubmitSpotSpinner.classList.remove('hidden');
+                 reSubmitSpotBtn.disabled = true;
+
+                 try {
+                     const reAnalyzeSpotSuggestion = httpsCallable(functions, 'reAnalyzeSpotSuggestion');
+                     const result = await reAnalyzeSpotSuggestion({
+                         ...pendingReAnalysisData,
+                         gmapsUrl: gmapsUrl,
+                         areaPositions: areaPositions
+                     });
+
+                     const reAnalyzedData = result.data;
+                     const finalData = { ...pendingReAnalysisData, ...reAnalyzedData };
+
+                     if (!finalData.prefecture || !supportedPrefectureNames.includes(finalData.prefecture)) {
+                         showInfoModal(`再分析しましたが、対応していない都道府県のようです。現在、${supportedPrefectureNames.join('、')}のスポットのみ提案を受け付けています。`);
+                         return; 
+                     }
+
+                     await addDoc(collection(db, "spot_submissions"), {
+                         ...finalData,
+                         submittedBy: currentUser.uid,
+                         submittedAt: serverTimestamp(),
+                         status: "pending"
+                     });
+
+                     showInfoModal("スポットの提案を送信しました。管理者の承認をお待ちください。");
+                     newSpotName.value = '';
+                     newSpotUrl.value = '';
+                     addSpotOverlay.classList.remove('visible');
+                     reAnalysisOverlay.classList.remove('visible');
+
+                 } catch(error) {
+                      console.error("AI再分析または提案の送信に失敗しました:", error);
+                      showInfoModal(`エラーが発生しました: ${error.message}`);
+                 } finally {
+                      reSubmitSpotSpinner.classList.add('hidden');
+                      reSubmitSpotBtn.disabled = false;
+                 }
+            });
+
+            function updateAdminBadgeUI() {
+                const totalPending = pendingSpotSubmissionsCount + pendingImageReportsCount;
+                submissionBadge.textContent = totalPending;
+                submissionBadge.classList.toggle('hidden', totalPending === 0);
+
+                imageReportBadge.textContent = pendingImageReportsCount;
+                imageReportBadge.classList.toggle('hidden', pendingImageReportsCount === 0);
+            }
+
+            function listenForSubmissions() {
+                const spotQuery = query(collection(db, "spot_submissions"), where("status", "==", "pending"));
+                
+                if (unsubscribeSpotSubmissions) unsubscribeSpotSubmissions();
+                unsubscribeSpotSubmissions = onSnapshot(spotQuery, (snapshot) => {
+                    submissionList.innerHTML = '';
+                     if (snapshot.empty) {
+                         submissionList.innerHTML = '<p class="text-center text-gray-500 py-10">承認待ちの提案はありません。</p>';
+                    }
+                    snapshot.forEach((doc) => {
+                        renderSubmissionCard(doc.id, doc.data());
+                    });
+                    pendingSpotSubmissionsCount = snapshot.size;
+                    updateAdminBadgeUI();
+                }, (error) => {
+                    console.error("Firestore permission error on spot_submissions:", error);
+                    if (error.code === 'permission-denied') {
+                        showInfoModal("管理者権限エラー: 提案リストの読み込みに失敗しました。アクセス権限を確認してください。");
+                        submissionPanelOverlay.classList.remove('visible');
+                        adminControls.classList.add('hidden');
+                    }
+                });
+            }
+
+            function listenForImageReports() {
+                const reportQuery = query(collection(db, "image_reports"), where("status", "==", "pending"));
+                
+                if (unsubscribeImageReports) unsubscribeImageReports();
+                unsubscribeImageReports = onSnapshot(reportQuery, (snapshot) => {
+                    imageReportList.innerHTML = '';
+                    if (snapshot.empty) {
+                        imageReportList.innerHTML = '<p class="text-center text-gray-500 py-10">承認待ちの画像レポートはありません。</p>';
+                    }
+                    snapshot.forEach((doc) => {
+                        renderImageReportCard(doc.id, doc.data());
+                    });
+                    pendingImageReportsCount = snapshot.size;
+                    updateAdminBadgeUI();
+                }, (error) => {
+                    console.error("Firestore permission error on image_reports:", error);
+                });
+            }
+
+            function renderImageReportCard(id, data) {
+                const card = document.createElement('div');
+                card.id = `report-${id}`;
+                card.className = 'bg-gray-50 p-4 rounded-lg border space-y-3';
+                
+                const spot = combinedSpots.find(s => s.name === data.spotName);
+
+                card.innerHTML = `
+                    <div>
+                        <h3 class="font-bold text-lg">${data.spotName}</h3>
+                        <p class="text-sm text-gray-500">報告者: ${data.submittedBy.substring(0,8)}...</p>
+                        <p class="text-sm text-gray-500">報告日時: ${data.submittedAt.toDate().toLocaleString('ja-JP')}</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <p class="font-semibold text-sm">現在の画像:</p>
+                        <img src="${spot?.image || 'https://placehold.co/100x75/ccc/FFF?text=N/A'}" class="w-24 h-auto rounded" onerror="this.onerror=null;this.src='https://placehold.co/100x75/ccc/FFF?text=Error';">
+                    </div>
+                    <div class="mt-4 flex gap-2">
+                        <button data-id="${id}" data-spot-name="${data.spotName}" class="update-image-btn flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-600">AIで画像を更新</button>
+                        <button data-id="${id}" class="reject-report-btn flex-1 bg-red-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-600">レポートを却下</button>
+                    </div>
+                `;
+                imageReportList.appendChild(card);
+            }
+
+            function renderSubmissionCard(id, data) {
+                const card = document.createElement('div');
+                card.id = `submission-${id}`;
+                card.className = 'bg-gray-50 p-4 rounded-lg border';
+                
+                const subCategoryOptions = subCategories[data.category] || [];
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-bold text-lg">${data.name}</h3>
+                            <p class="text-sm text-gray-500 mb-2">提案者: ${data.submittedBy.substring(0,8)}...</p>
+                            <div class="flex gap-4 mb-2">
+                                <a href="${data.website}" target="_blank" class="text-blue-600 hover:underline text-sm">公式サイト</a>
+                                <a href="${data.gmaps}" target="_blank" class="text-blue-600 hover:underline text-sm">Googleマップ</a>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                             <button data-id="${id}" class="edit-btn text-sm bg-yellow-100 text-yellow-800 py-1 px-3 rounded-full hover:bg-yellow-200">編集</button>
+                             <button data-id="${id}" class="save-btn text-sm bg-blue-100 text-blue-800 py-1 px-3 rounded-full hover:bg-blue-200 hidden">保存</button>
+                        </div>
+                    </div>
+                    <div class="bg-white p-3 rounded-md border text-sm space-y-3 mt-2 admin-edit-form">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="font-bold">カテゴリ</label>
+                                <select name="category" disabled>
+                                    <option value="観光" ${data.category === '観光' ? 'selected' : ''}>観光</option>
+                                    <option value="グルメ" ${data.category === 'グルメ' ? 'selected' : ''}>グルメ</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="font-bold">サブカテゴリ</label>
+                                <select name="subCategory" disabled>
+                                    ${subCategoryOptions.map(opt => `<option value="${opt}" ${data.subCategory === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center">
+                                <label class="font-bold">説明文</label>
+                                <button data-id="${id}" class="regenerate-description-btn text-xs bg-purple-100 text-purple-800 py-1 px-2 rounded-full hover:bg-purple-200 flex items-center gap-1">
+                                    <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                    <span>AIで再生成</span>
+                                    <div class="spinner w-3 h-3 border-t-2 border-b-2 border-purple-800 rounded-full animate-spin hidden"></div>
+                                </button>
+                            </div>
+                            <textarea name="description" rows="4" disabled>${data.description}</textarea>
+                        </div>
+                        <div>
+                            <label class="font-bold">タグ</label>
+                            <div class="tag-checkbox-group">
+                                ${standardTags.map(tag => `
+                                    <label class="tag-checkbox">
+                                        <input type="checkbox" name="tags" value="${tag}" ${(data.tags || []).includes(tag) ? 'checked' : ''} disabled>
+                                        <span class="ml-2 text-xs">${tag}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ${data.isNewArea ? `
+                        <div class="mt-3 p-3 bg-orange-50 border-l-4 border-orange-400">
+                            <h4 class="font-bold text-orange-800">新規エリアの提案が含まれています</h4>
+                            <p class="text-sm text-orange-700">スポット「${data.name}」は新しいエリア「${data.area}」に属しています。</p>
+                            <label class="mt-2 inline-flex items-center">
+                                <input type="checkbox" name="approveNewArea" class="rounded border-gray-300 text-orange-600 shadow-sm focus:border-orange-300 focus:ring focus:ring-offset-0 focus:ring-orange-200 focus:ring-opacity-50">
+                                <span class="ml-2 text-sm font-medium text-orange-800">この新しいエリアも同時に承認する</span>
+                            </label>
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="mt-4 flex gap-4">
+                        <button data-id="${id}" class="approve-btn flex-1 bg-green-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-600">承認</button>
+                        <button data-id="${id}" class="reject-btn flex-1 bg-red-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-600">却下</button>
+                    </div>
+                `;
+                submissionList.appendChild(card);
+            }
+            
+            openSubmissionPanelBtn.addEventListener('click', () => {
+                submissionPanelOverlay.classList.add('visible');
+            });
+            closeSubmissionPanelBtn.addEventListener('click', () => submissionPanelOverlay.classList.remove('visible'));
+
+            function updateStateWithNewData(spotData, newAreaData = null) {
+                combinedSpots.push(spotData);
+
+                const prefId = spotData.prefecture.replace(/[都府県]/, '');
+                if (allSpotsData[prefId]) {
+                    allSpotsData[prefId].push(spotData);
+                } else {
+                    allSpotsData[prefId] = [spotData];
+                }
+
+                if (newAreaData) {
+                    if (!areaPositions[prefId]) areaPositions[prefId] = [];
+                    areaPositions[prefId].push({ name: newAreaData.area, top: newAreaData.top, left: newAreaData.left });
+
+                    if (!allTransitData[prefId]) allTransitData[prefId] = {};
+                    
+                    if (Object.keys(newAreaData.transitData).length > 0) {
+                        allTransitData[prefId][newAreaData.area] = newAreaData.transitData;
+                        for (const [existingArea, time] of Object.entries(newAreaData.transitData)) {
+                            if (!allTransitData[prefId][existingArea]) {
+                                allTransitData[prefId][existingArea] = {};
+                            }
+                            allTransitData[prefId][existingArea][newAreaData.area] = time;
+                        }
+                    }
+                }
+            }
+
+            submissionList.addEventListener('click', async (e) => {
+                const target = e.target.closest('button');
+                if (!target) return;
+
+                const submissionId = target.dataset.id;
+                if (!submissionId) return;
+                
+                const card = document.getElementById(`submission-${submissionId}`);
+                const form = card.querySelector('.admin-edit-form');
+
+                if (target.classList.contains('edit-btn')) {
+                    form.querySelectorAll('input, textarea, select').forEach(el => el.disabled = false);
+                    target.classList.add('hidden');
+                    card.querySelector('.save-btn').classList.remove('hidden');
+                } else if (target.classList.contains('save-btn')) {
+                    const updatedData = {
+                        category: form.querySelector('[name="category"]').value,
+                        subCategory: form.querySelector('[name="subCategory"]').value,
+                        description: form.querySelector('[name="description"]').value,
+                        tags: Array.from(form.querySelectorAll('[name="tags"]:checked')).map(el => el.value)
+                    };
+                    
+                    target.disabled = true;
+                    target.textContent = '保存中...';
+                    
+                    try {
+                        const submissionRef = doc(db, "spot_submissions", submissionId);
+                        await updateDoc(submissionRef, updatedData);
+                        showInfoModal("提案内容を更新しました。");
+                    } catch (error) {
+                        console.error("提案の更新に失敗:", error);
+                        showInfoModal("更新に失敗しました。");
+                    } finally {
+                        form.querySelectorAll('input, textarea, select').forEach(el => el.disabled = true);
+                        target.classList.add('hidden');
+                        card.querySelector('.edit-btn').classList.remove('hidden');
+                        target.disabled = false;
+                        target.textContent = '保存';
+                    }
+                } else if (target.classList.contains('regenerate-description-btn')) {
+                    const spinner = target.querySelector('.spinner');
+                    const buttonText = target.querySelector('span');
+                    spinner.classList.remove('hidden');
+                    buttonText.classList.add('hidden');
+                    target.disabled = true;
+
+                    try {
+                        const submissionRef = doc(db, "spot_submissions", submissionId);
+                        const submissionSnap = await getDoc(submissionRef);
+                        if(submissionSnap.exists()) {
+                            const data = submissionSnap.data();
+                            const regenerateDescription = httpsCallable(functions, 'regenerateDescription');
+                            const result = await regenerateDescription({
+                                originalName: data.originalName,
+                                originalUrl: data.originalUrl
+                            });
+                            
+                            const newDescription = result.data.description;
+                            
+                            form.querySelector('[name="description"]').value = newDescription;
+                            await updateDoc(submissionRef, { description: newDescription });
+                            showInfoModal("説明文を再生成しました。内容を確認し、必要であれば保存してください。");
+                        }
+                    } catch (error) {
+                        console.error("説明文の再生成に失敗:", error);
+                        showInfoModal(`説明文の再生成に失敗しました: ${error.message}`);
+                    } finally {
+                        spinner.classList.add('hidden');
+                        buttonText.classList.remove('hidden');
+                        target.disabled = false;
+                    }
+
+                } else if (target.classList.contains('approve-btn')) {
+                    target.disabled = true;
+                    target.textContent = '承認中...';
+                    const submissionRef = doc(db, "spot_submissions", submissionId);
+                    const submissionSnap = await getDoc(submissionRef);
+                    if (submissionSnap.exists()) {
+                        const data = submissionSnap.data();
+                        const approveNewArea = card.querySelector('[name="approveNewArea"]')?.checked || false;
+
+                        const message = `スポット「${data.name}」を承認します。${(data.isNewArea && approveNewArea) ? `\n新しいエリア「${data.area}」も同時に承認されます。` : ''}\n対応するJSONファイルを選択して保存してください。`;
+                        
+                        showConfirmationModal(message, '承認して保存', 'bg-green-500', async () => {
+                            try {
+                                const prefId = data.prefecture.replace(/[都府県]/, '');
+                                const prefName = supportedPrefectureNames.find(name => name.startsWith(prefId)) || data.prefecture;
+                                
+                                let finalSpotData = { ...data };
+                                let newAreaDataToCreate = null;
+
+                                if (data.isNewArea && !approveNewArea) {
+                                    finalSpotData.area = "その他";
+                                    const existingOtherArea = originalJsonData[prefId]?.areaPositions.find(p => p.name === "その他");
+                                    if (!existingOtherArea) {
+                                        newAreaDataToCreate = {
+                                            area: "その他",
+                                            top: "95%", left: "95%",
+                                            transitData: {}
+                                        };
+                                    }
+                                } else if (data.isNewArea && approveNewArea) {
+                                    newAreaDataToCreate = {
+                                        area: data.area,
+                                        top: data.newAreaPosition.top,
+                                        left: data.newAreaPosition.left,
+                                        transitData: data.newTransitData
+                                    };
+                                }
+
+                                const imageData = await fetchImageForSpot(finalSpotData, prefName);
+                                
+                                const newSpotData = {
+                                    prefecture: finalSpotData.prefecture, name: finalSpotData.name, area: finalSpotData.area,
+                                    category: finalSpotData.category, subCategory: finalSpotData.subCategory,
+                                    description: finalSpotData.description, website: finalSpotData.website, gmaps: finalSpotData.gmaps,
+                                    stayTime: finalSpotData.stayTime, tags: finalSpotData.tags,
+                                    image: imageData ? imageData.url : `https://placehold.co/600x400/E57373/FFF?text=${encodeURIComponent(finalSpotData.name)}`,
+                                    imageSource: imageData ? imageData.displayLink : "ユーザー提案", 
+                                    imageSourceUrl: imageData ? imageData.sourceLink : finalSpotData.website,
+                                };
+                                
+                                const [fileHandle] = await window.showOpenFilePicker({
+                                    types: [{ description: 'JSON Files', accept: {'application/json': ['.json']} }],
+                                    suggestedName: `${prefId}.json`
+                                });
+                                
+                                const file = await fileHandle.getFile();
+                                const currentFileContent = await file.text();
+                                let currentJson = JSON.parse(currentFileContent || '{}');
+                                
+                                if (!currentJson.spots) currentJson.spots = [];
+                                currentJson.spots.push(newSpotData);
+
+                                if (newAreaDataToCreate) {
+                                    if (!currentJson.areaPositions) currentJson.areaPositions = [];
+                                    currentJson.areaPositions.push({ name: newAreaDataToCreate.area, top: newAreaDataToCreate.top, left: newAreaDataToCreate.left });
+                                    
+                                    if (Object.keys(newAreaDataToCreate.transitData).length > 0) {
+                                        if (!currentJson.transitData) currentJson.transitData = {};
+                                        currentJson.transitData[newAreaDataToCreate.area] = newAreaDataToCreate.transitData;
+                                        for (const [existingArea, time] of Object.entries(newAreaDataToCreate.transitData)) {
+                                            if (!currentJson.transitData[existingArea]) {
+                                                currentJson.transitData[existingArea] = {};
+                                            }
+                                            currentJson.transitData[existingArea][newAreaDataToCreate.area] = time;
+                                        }
+                                    }
+                                }
+                                
+                                const writable = await fileHandle.createWritable();
+                                await writable.write(JSON.stringify(currentJson, null, 2));
+                                await writable.close();
+                                
+                                updateStateWithNewData(newSpotData, newAreaDataToCreate);
+                                
+                                await addDoc(collection(db, "announcements"), {
+                                    title: "新しいスポットが追加されました！",
+                                    message: `「${newSpotData.name}」（${newSpotData.prefecture}）が新しく追加されました。`,
+                                    createdAt: serverTimestamp(),
+                                });
+
+                                await deleteDoc(submissionRef);
+                                
+                                renderAll();
+                                
+                                showInfoModal("承認処理が完了し、サイトに即時反映されました。");
+                                
+                            } catch(err) {
+                                console.error("ファイルの保存または状態の更新に失敗しました:", err);
+                                showInfoModal("ファイルの保存がキャンセルされたか、失敗しました。");
+                                target.disabled = false;
+                                target.textContent = '承認';
+                            }
+                        });
+                        target.disabled = false;
+                        target.textContent = '承認';
+                    }
+                } else if (target.classList.contains('reject-btn')) {
+                    target.disabled = true;
+                    target.textContent = '却下中...';
+                    const submissionRef = doc(db, "spot_submissions", submissionId);
+                    await deleteDoc(submissionRef);
+                    showInfoModal("提案を却下しました。");
+                }
+            });
+
+            mailboxBtn.addEventListener('click', () => {
+                document.body.classList.add('overflow-hidden');
+                mailboxPanelOverlay.classList.remove('hidden');
+                mailboxPanel.classList.remove('translate-x-full');
+            });
+
+            const closeMailboxPanel = async () => {
+                document.body.classList.remove('overflow-hidden');
+                mailboxPanel.classList.add('translate-x-full');
+                mailboxPanelOverlay.classList.add('hidden');
+
+                // Mark personal notifications as read in Firestore
+                if (currentUser && !currentUser.isAnonymous) {
+                    const unreadQuery = query(collection(db, "users", currentUser.uid, "mailbox"), where("read", "==", false));
+                    try {
+                        const unreadSnapshot = await getDocs(unreadQuery);
+                        if (!unreadSnapshot.empty) {
+                            const batch = writeBatch(db);
+                            unreadSnapshot.forEach(doc => {
+                                batch.update(doc.ref, { read: true });
+                            });
+                            await batch.commit();
+                        }
+                    } catch (error) {
+                        console.error("Error marking personal notifications as read:", error);
+                    }
+                }
+
+                // Mark public announcements as read in localStorage
+                const latestTimestamp = Math.max(0, ...localAnnouncements.map(n => n.createdAt?.toMillis() || 0));
+                localStorage.setItem('lastReadAnnouncementTimestamp', latestTimestamp);
+                
+                mailboxBadge.classList.add('hidden');
+            };
+            mailboxCloseBtn.addEventListener('click', closeMailboxPanel);
+            mailboxPanelOverlay.addEventListener('click', closeMailboxPanel);
+
+            function renderMailbox(docs, lastReadTimestamp) {
+                mailboxList.innerHTML = '';
+                if (docs.length === 0) {
+                    mailboxList.innerHTML = '<p class="text-center text-gray-500 py-10">お知らせはありません。</p>';
+                    return;
+                }
+                
+                docs.forEach(docData => {
+                    const isRead = docData.type === 'personal' ? docData.read : (docData.createdAt?.toMillis() || 0) <= lastReadTimestamp;
+                    const item = document.createElement('div');
+                    item.className = `p-4 border-b ${!isRead ? 'bg-orange-50 font-bold' : 'bg-white'}`;
+                    
+                    const date = docData.submittedAt?.toDate().toLocaleString('ja-JP') || '日付不明';
+
+                    item.innerHTML = `
+                        <h4 class="text-md ${!isRead ? 'text-orange-800' : 'text-gray-800'}">${docData.title}</h4>
+                        <p class="text-sm mt-1 ${!isRead ? 'text-orange-700' : 'text-gray-600'}">${docData.message}</p>
+                        <p class="text-xs text-gray-400 mt-2 text-right">${date}</p>
+                    `;
+                    mailboxList.appendChild(item);
+                });
+            }
+            
+            markAllAsReadBtn.addEventListener('click', async () => {
+                if (!currentUser || currentUser.isAnonymous) return;
+                
+                // Mark personal notifications as read in Firestore
+                const unreadQuery = query(collection(db, "users", currentUser.uid, "mailbox"), where("read", "==", false));
+                try {
+                    const unreadSnapshot = await getDocs(unreadQuery);
+                    if (!unreadSnapshot.empty) {
+                        const batch = writeBatch(db);
+                        unreadSnapshot.forEach(doc => {
+                            batch.update(doc.ref, { read: true });
+                        });
+                        await batch.commit();
+                    }
+                } catch (error) {
+                    console.error("Error in markAllAsReadBtn for personal notifications:", error);
+                }
+
+                // Mark public announcements as read in localStorage
+                const latestTimestamp = Math.max(0, ...localAnnouncements.map(n => n.createdAt?.toMillis() || 0));
+                localStorage.setItem('lastReadAnnouncementTimestamp', latestTimestamp);
+            });
+
+            async function fetchImageForSpot(spot, prefectureName) {
+                try {
+                    const fetchImageForSpotCallable = httpsCallable(functions, 'fetchImageForSpot');
+                    const result = await fetchImageForSpotCallable({
+                        spot: spot,
+                        prefectureName: prefectureName
+                    });
+                    return result.data;
+                } catch (error) {
+                    console.error(`「${spot.name}」の画像取得エラー:`, error);
+                    return null;
+                }
+            }
+
+            batchUpdateImagesBtn.addEventListener('click', () => {
+                prefectureSelectTitle.textContent = "画像一括更新";
+                prefectureSelectMessage.textContent = "どの都道府県のスポット画像を更新しますか？";
+                prefectureSelectButtons.innerHTML = '';
+
+                Object.keys(originalJsonData).forEach(prefId => {
+                    const prefName = originalJsonData[prefId].name;
+                    const button = document.createElement('button');
+                    button.textContent = prefName;
+                    button.className = 'w-full py-2 px-6 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600';
+                    button.onclick = () => {
+                        prefectureSelectOverlay.classList.remove('visible');
+                        batchUpdateImages(prefId, prefName);
+                    };
+                    prefectureSelectButtons.appendChild(button);
+                });
+                prefectureSelectOverlay.classList.add('visible');
+            });
+            prefectureSelectCancelBtn.addEventListener('click', () => prefectureSelectOverlay.classList.remove('visible'));
+
+            async function batchUpdateImages(prefId, prefName) {
+                const spotsToUpdate = allSpotsData[prefId];
+                if (!spotsToUpdate || spotsToUpdate.length === 0) {
+                    showInfoModal(`${prefName}には更新対象のスポットがありません。`);
+                    return;
+                }
+
+                progressOverlay.classList.add('visible');
+                let updatedCount = 0;
+                let failedCount = 0;
+
+                for (let i = 0; i < spotsToUpdate.length; i++) {
+                    const spot = spotsToUpdate[i];
+                    progressMessage.textContent = `処理中: ${i + 1} / ${spotsToUpdate.length} - ${spot.name}`;
+                    progressBar.style.width = `${((i + 1) / spotsToUpdate.length) * 100}%`;
+
+                    const imageData = await fetchImageForSpot(spot, prefName);
+                    if (imageData) {
+                        spot.image = imageData.url;
+                        spot.imageSource = imageData.displayLink;
+                        spot.imageSourceUrl = imageData.sourceLink;
+                        updatedCount++;
+                    } else {
+                        failedCount++;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+                
+                progressOverlay.classList.remove('visible');
+
+                const summaryMessage = `${prefName}の全${spotsToUpdate.length}件のスポットのうち、${updatedCount}件の画像を更新し、${failedCount}件が失敗しました。更新内容をJSONファイルに保存しますか？`;
+                showConfirmationModal(summaryMessage, 'JSONを保存', 'bg-blue-500', async () => {
+                    try {
+                        const fileData = originalJsonData[prefId];
+                        fileData.spots = spotsToUpdate; 
+
+                        const [fileHandle] = await window.showOpenFilePicker({
+                            types: [{ description: 'JSON Files', accept: {'application/json': ['.json']} }],
+                            suggestedName: `${prefId}.json`
+                        });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(JSON.stringify(fileData, null, 2));
+                        await writable.close();
+                        showInfoModal("ファイルの保存が完了しました。ページをリロードして変更を反映してください。");
+                    } catch (err) {
+                        console.error("ファイル保存エラー:", err);
+                        showInfoModal("ファイルの保存がキャンセルされたか、失敗しました。");
+                    }
+                });
+            }
+
+            // NEW: Event listener for the report image button in the modal
+            reportImageBtn.addEventListener('click', () => {
+                const spotName = modal.dataset.spotName;
+                if (!spotName) return;
+
+                showConfirmationModal(`「${spotName}」の画像が正しくない、または不適切であるとして報告しますか？`, '報告する', 'bg-red-500', async () => {
+                    if (!currentUser) {
+                        showInfoModal("報告するにはログインが必要です。");
+                        return;
+                    }
+                    try {
+                        await addDoc(collection(db, "image_reports"), {
+                            spotName: spotName,
+                            submittedBy: currentUser.uid,
+                            submittedAt: serverTimestamp(),
+                            status: "pending"
+                        });
+                        showInfoModal("画像を報告しました。管理者が確認します。");
+                        closeModal();
+                    } catch (error) {
+                        console.error("Error reporting image:", error);
+                        showInfoModal("報告に失敗しました。");
+                    }
+                });
+            });
+            
+            // NEW: Delegated event listener for image report cards
+            imageReportList.addEventListener('click', async (e) => {
+                const target = e.target.closest('button');
+                if (!target) return;
+
+                const reportId = target.dataset.id;
+                if (!reportId) return;
+                
+                const reportRef = doc(db, "image_reports", reportId);
+
+                if (target.classList.contains('reject-report-btn')) {
+                    showConfirmationModal(`この画像レポートを却下しますか？`, '却下する', 'bg-red-500', async () => {
+                        await deleteDoc(reportRef);
+                        showInfoModal("レポートを却下しました。");
+                    });
+                } else if (target.classList.contains('update-image-btn')) {
+                    const spotName = target.dataset.spotName;
+                    const spot = combinedSpots.find(s => s.name === spotName);
+                    if (!spot) {
+                        showInfoModal("対象のスポットが見つかりませんでした。");
+                        return;
+                    }
+
+                    showConfirmationModal(`「${spotName}」の画像をAIで再取得し、JSONファイルを更新しますか？`, '更新して保存', 'bg-blue-500', async () => {
+                        progressOverlay.classList.add('visible');
+                        progressMessage.textContent = `処理中: ${spot.name}の画像を取得しています...`;
+                        progressBar.style.width = `50%`;
+
+                        const prefName = spot.prefecture;
+                        const imageData = await fetchImageForSpot(spot, prefName);
+
+                        if (!imageData) {
+                            progressOverlay.classList.remove('visible');
+                            showInfoModal("新しい画像の取得に失敗しました。");
+                            return;
+                        }
+                        
+                        const prefId = prefName.replace(/[都府県]/, '');
+                        const fileData = JSON.parse(JSON.stringify(originalJsonData[prefId])); // Deep copy
+                        const spotIndex = fileData.spots.findIndex(s => s.name === spotName);
+                        
+                        if (spotIndex === -1) {
+                            progressOverlay.classList.remove('visible');
+                            showInfoModal("JSONデータ内でスポットが見つかりませんでした。");
+                            return;
+                        }
+
+                        fileData.spots[spotIndex].image = imageData.url;
+                        fileData.spots[spotIndex].imageSource = imageData.displayLink;
+                        fileData.spots[spotIndex].imageSourceUrl = imageData.sourceLink;
+
+                        try {
+                            const [fileHandle] = await window.showOpenFilePicker({
+                                types: [{ description: 'JSON Files', accept: {'application/json': ['.json']} }],
+                                suggestedName: `${prefId}.json`
+                            });
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(JSON.stringify(fileData, null, 2));
+                            await writable.close();
+                            
+                            await deleteDoc(reportRef);
+                            
+                            // Update local data for immediate reflection
+                            originalJsonData[prefId] = fileData;
+                            const combinedSpotIndex = combinedSpots.findIndex(s => s.name === spotName);
+                            if (combinedSpotIndex !== -1) {
+                                combinedSpots[combinedSpotIndex] = fileData.spots[spotIndex];
+                            }
+                            allSpotsData[prefId] = fileData.spots;
+                            
+                            renderAll();
+                            progressOverlay.classList.remove('visible');
+                            showInfoModal("画像の更新とファイルの保存が完了しました。");
+
+                        } catch (err) {
+                            progressOverlay.classList.remove('visible');
+                            console.error("ファイル保存エラー:", err);
+                            showInfoModal("ファイルの保存がキャンセルされたか、失敗しました。");
+                        }
+                    });
+                }
+            });
+
+            // NEW: Tab switching logic for submission panel
+            submissionTabs.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (!button) return;
+
+                const tab = button.dataset.tab;
+                submissionTabs.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                if (tab === 'submissions') {
+                    submissionContent.classList.remove('hidden');
+                    imageReportContent.classList.add('hidden');
+                } else if (tab === 'image-reports') {
+                    submissionContent.classList.add('hidden');
+                    imageReportContent.classList.remove('hidden');
+                }
+            });
+
+            function renderAll() {
+                renderSpots();
+                renderPlan();
+            }
+            
+            renderAll();
+        });
+    </script>
+</body>
+</html>
