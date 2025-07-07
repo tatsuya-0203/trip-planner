@@ -353,7 +353,7 @@
                         <span id="mailbox-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"></span>
                     </button>
                     <button id="user-settings-btn" class="p-2 rounded-full hover:bg-gray-200 transition-colors">
-                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066 2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066 2.573c-.94-1.543.826 3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     </button>
                 </div>
                 <div class="text-center">
@@ -534,6 +534,18 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- NEW: Batch Update Prefecture Select Modal -->
+        <div id="batch-update-prefecture-select-overlay" class="overlay-base z-[53]">
+            <div class="modal-base max-w-sm p-6 text-center">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">画像更新の対象を選択</h3>
+                <p class="text-base mb-6">どの都道府県の画像を更新しますか？</p>
+                <div id="batch-update-prefecture-select-buttons" class="flex flex-col gap-3 max-h-60 overflow-y-auto">
+                    <!-- Buttons will be injected here -->
+                </div>
+                <button id="batch-update-prefecture-select-cancel-btn" class="w-full mt-4 py-2 px-6 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300">キャンセル</button>
             </div>
         </div>
 
@@ -1078,6 +1090,10 @@
             const batchUpdateCancelBtn = document.getElementById('batch-update-cancel-btn');
             const batchUpdateConfirmBtn = document.getElementById('batch-update-confirm-btn');
             const batchUpdateCount = document.getElementById('batch-update-count');
+            // New elements for prefecture selection
+            const batchUpdatePrefectureSelectOverlay = document.getElementById('batch-update-prefecture-select-overlay');
+            const batchUpdatePrefectureSelectButtons = document.getElementById('batch-update-prefecture-select-buttons');
+            const batchUpdatePrefectureSelectCancelBtn = document.getElementById('batch-update-prefecture-select-cancel-btn');
             
             let currentPrefecture = 'all';
             let currentFilters = { category: 'all', area: 'all', tag: 'all' };
@@ -1590,22 +1606,15 @@
                     return;
                 }
 
-                // This part is a simple placeholder. A real implementation might use a library
-                // or more complex CSS to create a visually appealing map line.
-                const mapLine = document.createElement('div');
-                if (currentPrefecture === 'tokyo') {
-                    mapLine.className = 'yamanote-line';
-                } else if (currentPrefecture === 'osaka') {
-                    mapLine.className = 'osaka-loop-line';
-                }
-                mapContainer.appendChild(mapLine);
+                // 線の描画（省略）
 
+                // 「全エリア」ボタンを右下（90%, 90%）に配置
                 const allBtn = document.createElement('button');
                 allBtn.dataset.area = 'all';
                 allBtn.textContent = '全エリア';
                 allBtn.className = `map-area-button ${currentPrefecture}`;
-                allBtn.style.top = '50%';
-                allBtn.style.left = '50%';
+                allBtn.style.top = '90%';   // ここを変更
+                allBtn.style.left = '90%';  // ここを変更
                 if (currentFilters.area === 'all') allBtn.classList.add('active');
                 mapContainer.appendChild(allBtn);
 
@@ -2220,7 +2229,7 @@
             });
 
             const eyeIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>`;
-            const eyeSlashIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7 1.274-4.057 5.064 7 9.542 7 .847 0 1.673.124 2.468.352M15 12a3 3 0 11-6 0 3 3 0 016 0zm6 0a9.953 9.953 0 01-1.043 4.125M1.957 5.957A9.953 9.953 0 013 5m18 0l-2.675 2.675M3 3l18 18"></path></svg>`;
+            const eyeSlashIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>`;
             
             passwordToggle.innerHTML = eyeIcon;
             confirmPasswordToggle.innerHTML = eyeIcon;
@@ -2256,7 +2265,7 @@
 
                     settingsUsernameInput.value = currentUser.displayName || '';
                     settingsEmail.textContent = currentUser.email || 'N/A';
-                    settingsIconPreview.src = currentUser.photoURL || 'https://placehold.co/40x40/D35400/FFF?text=👤';
+                    settingsIconPreview.src = currentUser.photoURL || 'https://placehold.co/40x40/D35400/FFF?text=�';
                 }
                 showOverlay(userSettingsOverlay);
             });
@@ -2850,8 +2859,47 @@
                 localStorage.setItem('lastReadAnnouncementTimestamp', latestTimestamp);
             });
 
-            // --- Batch Image Update Logic ---
-            batchUpdateImagesBtn.addEventListener('click', async () => {
+            // --- Batch Image Update Logic (MODIFIED) ---
+
+            // 1. Function to open the prefecture selection modal
+            function openBatchUpdatePrefectureSelect() {
+                batchUpdatePrefectureSelectButtons.innerHTML = ''; // Clear previous buttons
+
+                // Add "All Prefectures" option
+                const allBtn = document.createElement('button');
+                allBtn.className = 'w-full py-2 px-6 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600';
+                allBtn.textContent = 'すべての都道府県';
+                allBtn.dataset.prefectureId = 'all';
+                batchUpdatePrefectureSelectButtons.appendChild(allBtn);
+
+                // Add each available prefecture from the main filter dropdown
+                const prefectureFilter = document.getElementById('prefecture-filter');
+                // Start from index 1 to skip "すべての都道府県" option
+                for (let i = 1; i < prefectureFilter.options.length; i++) {
+                    const option = prefectureFilter.options[i];
+                    const prefBtn = document.createElement('button');
+                    prefBtn.className = 'w-full py-2 px-6 bg-white border border-gray-300 rounded-lg font-semibold hover:bg-gray-100';
+                    prefBtn.textContent = option.textContent;
+                    prefBtn.dataset.prefectureId = option.value;
+                    batchUpdatePrefectureSelectButtons.appendChild(prefBtn);
+                }
+                showOverlay(batchUpdatePrefectureSelectOverlay);
+            }
+
+            // 2. Attach listener to the main "Batch Update" button
+            batchUpdateImagesBtn.addEventListener('click', () => {
+                openBatchUpdatePrefectureSelect();
+            });
+
+            // 3. Add listener for the selection buttons inside the new modal
+            batchUpdatePrefectureSelectButtons.addEventListener('click', async (e) => {
+                const button = e.target.closest('button');
+                if (!button || !button.dataset.prefectureId) return;
+
+                const prefectureId = button.dataset.prefectureId;
+                hideOverlay(batchUpdatePrefectureSelectOverlay); // Hide selection modal
+
+                // Show the results modal and start the search
                 showOverlay(batchImageUpdateOverlay);
                 batchUpdateList.innerHTML = '';
                 batchUpdateList.classList.add('hidden');
@@ -2862,7 +2910,8 @@
 
                 try {
                     const batchFindImageUpdatesCallable = httpsCallable(functions, 'batchFindImageUpdates');
-                    const result = await batchFindImageUpdatesCallable();
+                    // Pass the selected prefectureId to the Cloud Function
+                    const result = await batchFindImageUpdatesCallable({ prefectureId: prefectureId });
                     proposedImageUpdates = result.data;
                     
                     batchUpdateLoading.classList.add('hidden');
@@ -2900,6 +2949,12 @@
                     batchUpdateList.innerHTML = `<p class="text-center text-red-500 py-10">更新候補の取得に失敗しました。<br>${error.message}</p>`;
                 }
             });
+            
+            // 4. Add cancel button listener for the new modal
+            batchUpdatePrefectureSelectCancelBtn.addEventListener('click', () => {
+                hideOverlay(batchUpdatePrefectureSelectOverlay);
+            });
+
 
             function updateBatchConfirmButton() {
                 const checkedCount = batchUpdateList.querySelectorAll('.batch-update-checkbox:checked').length;

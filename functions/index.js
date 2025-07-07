@@ -6,6 +6,7 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const fetch = require("node-fetch");
+const cors = require('cors')({origin: true});
 
 admin.initializeApp();
 
@@ -439,11 +440,10 @@ exports.resolveImageReport = functions.region("asia-northeast1").https.onCall(as
     }
 });
 
-
 /**
- * [新規] フロントエンドが呼び出すための、利用可能な都道府県リストを取得する関数
+ * [修正] 都道府県リストを取得する内部ロジック
  */
-exports.getPrefectureList = functions.region("asia-northeast1").https.onCall(async (data, context) => {
+async function _getPrefectureListLogic() {
     const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/data?ref=${GITHUB_BRANCH}`;
     try {
         const directoryResponse = await fetch(url, {
@@ -456,7 +456,7 @@ exports.getPrefectureList = functions.region("asia-northeast1").https.onCall(asy
         if (!directoryResponse.ok) {
             const errorText = await directoryResponse.text();
             console.error("GitHub API error (directory):", errorText);
-            throw new functions.https.HttpsError("internal", "GitHubのdataディレクトリの取得に失敗しました。");
+            throw new Error("GitHubのdataディレクトリの取得に失敗しました。");
         }
 
         const files = await directoryResponse.json();
@@ -485,65 +485,96 @@ exports.getPrefectureList = functions.region("asia-northeast1").https.onCall(asy
         return validPrefectures;
 
     } catch (error) {
-        console.error("getPrefectureList関数でエラー:", error);
-        if (error instanceof functions.https.HttpsError) throw error;
-        throw new functions.https.HttpsError("internal", "都道府県リストの取得中にサーバーでエラーが発生しました。");
+        console.error("_getPrefectureListLogic関数でエラー:", error);
+        // HttpsErrorではなく、呼び出し元で処理できるよう通常のErrorをスローする
+        throw new Error("都道府県リストの取得中にサーバーでエラーが発生しました。");
+    }
+}
+
+
+/**
+ * フロントエンドが呼び出すための、利用可能な都道府県リストを取得する関数
+ */
+exports.getPrefectureList = functions.region("asia-northeast1").https.onCall(async (data, context) => {
+    try {
+        return await _getPrefectureListLogic();
+    } catch (error) {
+        console.error("getPrefectureList HttpsCallable Error:", error);
+        throw new functions.https.HttpsError("internal", error.message);
     }
 });
 
 /**
- * [新規] 画像の一括更新候補を探す関数
+ * [修正] 画像の一括更新候補を探す関数
+ * タイムアウトを延長し、都道府県指定に対応
  */
-exports.batchFindImageUpdates = functions.region("asia-northeast1").https.onCall(async (data, context) => {
+exports.batchFindImageUpdates = functions.runWith({ timeoutSeconds: 540 }).region("asia-northeast1").https.onCall(async (data, context) => {
     if (!context.auth || !context.auth.token.admin) {
         throw new functions.https.HttpsError("permission-denied", "この操作には管理者権限が必要です。");
     }
+    
+    const { prefectureId } = data; // 'all' または 'tokyo' など
 
-    const getPrefectureListCallable = httpsCallable(functions, 'getPrefectureList');
-    const prefectureListResult = await getPrefectureListCallable.call(context);
-    const availablePrefectures = prefectureListResult.data;
+    try {
+        let prefecturesToProcess = [];
+        const allPrefectures = await _getPrefectureListLogic();
 
-    let proposedUpdates = [];
-
-    for (const pref of availablePrefectures) {
-        try {
-            const { content: currentJson } = await getGitHubFile(`data/${pref.id}.json`);
-            const spotsToUpdate = currentJson.spots.filter(spot => spot.image && spot.image.includes('placehold.co'));
-
-            for (const spot of spotsToUpdate) {
-                try {
-                    const imageResult = await _fetchImageForSpotLogic({
-                        spot: spot,
-                        prefectureName: spot.prefecture,
-                        reportedImageUrl: null
-                    });
-
-                    if (imageResult.candidates && imageResult.candidates.length > 0) {
-                        const newImage = imageResult.candidates[0];
-                        proposedUpdates.push({
-                            spotName: spot.name,
-                            prefecture: spot.prefecture,
-                            area: spot.area,
-                            oldImageUrl: spot.image,
-                            newImageUrl: newImage.url,
-                            newImageSource: newImage.displayLink,
-                            newImageSourceUrl: newImage.sourceLink,
-                        });
-                    }
-                } catch (spotError) {
-                    console.error(`Error fetching image for spot ${spot.name}:`, spotError);
-                }
+        if (prefectureId && prefectureId !== 'all') {
+            const singlePref = allPrefectures.find(p => p.id === prefectureId);
+            if (singlePref) {
+                prefecturesToProcess.push(singlePref);
+            } else {
+                 throw new functions.https.HttpsError("not-found", "指定された都道府県が見つかりません。");
             }
-        } catch (fileError) {
-            console.error(`Error processing file for prefecture ${pref.name}:`, fileError);
+        } else {
+            prefecturesToProcess = allPrefectures;
         }
-    }
+        
+        let proposedUpdates = [];
 
-    return proposedUpdates;
+        for (const pref of prefecturesToProcess) {
+            try {
+                const { content: currentJson } = await getGitHubFile(`data/${pref.id}.json`);
+                const spotsToUpdate = currentJson.spots.filter(spot => spot.image && spot.image.includes('placehold.co'));
+
+                for (const spot of spotsToUpdate) {
+                    try {
+                        const imageResult = await _fetchImageForSpotLogic({
+                            spot: spot,
+                            prefectureName: spot.prefecture,
+                            reportedImageUrl: null
+                        });
+
+                        if (imageResult.candidates && imageResult.candidates.length > 0) {
+                            const newImage = imageResult.candidates[0];
+                            proposedUpdates.push({
+                                spotName: spot.name,
+                                prefecture: spot.prefecture,
+                                area: spot.area,
+                                oldImageUrl: spot.image,
+                                newImageUrl: newImage.url,
+                                newImageSource: newImage.displayLink,
+                                newImageSourceUrl: newImage.sourceLink,
+                            });
+                        }
+                    } catch (spotError) {
+                        console.error(`Error fetching image for spot ${spot.name}:`, spotError);
+                    }
+                }
+            } catch (fileError) {
+                console.error(`Error processing file for prefecture ${pref.name}:`, fileError);
+            }
+        }
+        return proposedUpdates;
+    } catch (error) {
+        console.error("batchFindImageUpdates HttpsCallable Error:", error);
+        throw new functions.https.HttpsError("internal", error.message);
+    }
 });
 
+
 /**
- * [新規] 承認された画像更新をGitHubに反映させる関数
+ * 承認された画像更新をGitHubに反映させる関数
  */
 exports.confirmImageUpdates = functions.runWith({ timeoutSeconds: 300 }).region("asia-northeast1").https.onCall(async (data, context) => {
     if (!context.auth || !context.auth.token.admin) {
