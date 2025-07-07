@@ -1,6 +1,6 @@
 /**
  * VLOG旅プランナー バックエンド処理 (Firebase Cloud Functions)
- * 第1世代関数構文・最終修正版
+ * 第1世代関数構文・画像一括更新機能対応版
  */
 
 const functions = require("firebase-functions");
@@ -9,7 +9,7 @@ const fetch = require("node-fetch");
 
 admin.initializeApp();
 
-// --- 環境変数の読み込み (第1世代の方式) ---
+// --- 環境変数の読み込み ---
 const GEMINI_API_KEY = functions.config().gemini.key;
 const GOOGLE_SEARCH_KEY = functions.config().google.search_key;
 const GOOGLE_SEARCH_ID = functions.config().google.search_engine_id;
@@ -17,12 +17,6 @@ const GITHUB_TOKEN = functions.config().github.token;
 const GITHUB_OWNER = functions.config().github.owner;
 const GITHUB_REPO = functions.config().github.repo;
 const GITHUB_BRANCH = functions.config().github.branch;
-
-// --- 都道府県名からファイルIDへの変換マップ ---
-const prefectureIdMap = {
-    '東京都': 'tokyo',
-    '大阪府': 'osaka'
-};
 
 // --- GitHub API ヘルパー関数 ---
 async function getGitHubFile(filePath) {
@@ -68,20 +62,64 @@ async function updateGitHubFile(filePath, newContent, sha, commitMessage) {
     return await response.json();
 }
 
+/**
+ * [動的] GitHubのdata/ディレクトリから都道府県名とIDのマップを生成する
+ */
+async function getPrefectureIdMap() {
+    const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/data?ref=${GITHUB_BRANCH}`;
+    try {
+        const response = await fetch(url, {
+            headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Accept": "application/vnd.github.v3+json" },
+        });
+        if (!response.ok) {
+            console.error("Failed to get prefecture list from GitHub for map creation. Falling back to default.");
+            return { '東京都': 'tokyo', '大阪府': 'osaka' }; // フォールバック
+        }
+        const files = await response.json();
+        const jsonFiles = Array.isArray(files) ? files.filter(file => file.name.endsWith('.json')) : [];
+
+        const map = {};
+        await Promise.all(
+            jsonFiles.map(async (file) => {
+                try {
+                    const fileData = await getGitHubFile(`data/${file.name}`);
+                    const id = file.name.replace('.json', '');
+                    const name = fileData.content.name;
+                    if (name && id) {
+                        map[name] = id;
+                    }
+                } catch (e) {
+                    console.error(`Error processing file ${file.name} for map:`, e);
+                }
+            })
+        );
+        return Object.keys(map).length > 0 ? map : { '東京都': 'tokyo', '大阪府': 'osaka' }; // 空の場合のフォールバック
+    } catch (error) {
+        console.error("Error in getPrefectureIdMap:", error);
+        return { '東京都': 'tokyo', '大阪府': 'osaka' }; // エラー時のフォールバック
+    }
+}
+
+
 // --- AI関数 ---
 
 exports.analyzeSpotSuggestion = functions.region("asia-northeast1").https.onCall(async (data, context) => {
     const { spotName, spotUrl, areaPositions, standardTags } = data;
     if (!spotName || !spotUrl) throw new functions.https.HttpsError("invalid-argument", "スポット名とURLは必須です。");
+
+    const prefectureIdMap = await getPrefectureIdMap();
+    const supportedPrefectureNames = Object.keys(prefectureIdMap);
+
     const prompt = `あなたは旅行情報サイトの優秀な編集者です。以下の情報を基に、VLOG旅プランナーに追加するスポット情報をJSON形式で生成してください。
-# コンテキスト：既存のエリアマップ情報
-${JSON.stringify(areaPositions, null, 2)}
+# コンテキスト：
+- 既存のエリアマップ情報: ${JSON.stringify(areaPositions, null, 2)}
+- 現在対応している都道府県リスト: ${supportedPrefectureNames.join(', ')}
 # 入力情報
 - スポット名: ${spotName}
 - 参考URL: ${spotUrl}
 # 生成ルール
 1. 参考URLの内容を分析し、以下の項目を埋めてください。
-2. **都道府県とエリア**: スポットの所在地から、最も適切と思われる「prefecture」と「area」を決定してください。
+2. **都道府県とエリア**: スポットの所在地から、最も適切と思われる「prefecture」と「area」を決定してください。「prefecture」は必ず「現在対応している都道府県リスト」の中から選んでください。
 3. **エリアの判定**:
    * もし決定した「area」が、コンテキスト内の該当都道府県の「areaPositions」に**既に存在する場合**は、「isNewArea」を \`false\` にし、「newAreaPosition」と「newTransitData」は \`null\` にしてください。
    * もし決定した「area」が**存在しない場合**は、「isNewArea」を \`true\` にし、コンテキストの既存エリアとの地理的関係を考慮して、新しいエリアのマップ上の位置（topとleftのパーセンテージ文字列）と、既存エリアとの「transitData」（移動時間）を**必ず計算**してください。
@@ -281,6 +319,7 @@ exports.approveSubmission = functions.region("asia-northeast1").https.onCall(asy
     const { submissionId, submissionData, approveNewArea } = data;
     const db = admin.firestore();
     
+    const prefectureIdMap = await getPrefectureIdMap(); // 動的にマップを取得
     const prefId = prefectureIdMap[submissionData.prefecture];
     if (!prefId) {
         throw new functions.https.HttpsError("invalid-argument", `未対応の都道府県です: ${submissionData.prefecture}`);
@@ -370,6 +409,7 @@ exports.resolveImageReport = functions.region("asia-northeast1").https.onCall(as
     }
     const db = admin.firestore();
 
+    const prefectureIdMap = await getPrefectureIdMap(); // 動的にマップを取得
     const prefId = prefectureIdMap[prefecture];
     if (!prefId) {
         throw new functions.https.HttpsError("invalid-argument", `未対応の都道府県です: ${prefecture}`);
@@ -397,4 +437,160 @@ exports.resolveImageReport = functions.region("asia-northeast1").https.onCall(as
         if (error instanceof functions.https.HttpsError) throw error;
         throw new functions.https.HttpsError("internal", "画像レポートの解決に失敗しました。");
     }
+});
+
+
+/**
+ * [新規] フロントエンドが呼び出すための、利用可能な都道府県リストを取得する関数
+ */
+exports.getPrefectureList = functions.region("asia-northeast1").https.onCall(async (data, context) => {
+    const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/data?ref=${GITHUB_BRANCH}`;
+    try {
+        const directoryResponse = await fetch(url, {
+            headers: {
+                "Authorization": `token ${GITHUB_TOKEN}`,
+                "Accept": "application/vnd.github.v3+json",
+            },
+        });
+
+        if (!directoryResponse.ok) {
+            const errorText = await directoryResponse.text();
+            console.error("GitHub API error (directory):", errorText);
+            throw new functions.https.HttpsError("internal", "GitHubのdataディレクトリの取得に失敗しました。");
+        }
+
+        const files = await directoryResponse.json();
+        const jsonFiles = Array.isArray(files) ? files.filter(file => file.name.endsWith('.json')) : [];
+
+        const prefectureList = await Promise.all(
+            jsonFiles.map(async (file) => {
+                try {
+                    const fileData = await getGitHubFile(`data/${file.name}`);
+                    const id = file.name.replace('.json', '');
+                    const name = fileData.content.name;
+                    if (id && name) {
+                        return { id, name };
+                    }
+                    return null;
+                } catch (error) {
+                    console.error(`Error fetching or parsing ${file.name}:`, error);
+                    return null;
+                }
+            })
+        );
+        
+        const validPrefectures = prefectureList.filter(Boolean);
+        validPrefectures.sort((a, b) => a.id.localeCompare(b.id)); // 順序を安定させる
+
+        return validPrefectures;
+
+    } catch (error) {
+        console.error("getPrefectureList関数でエラー:", error);
+        if (error instanceof functions.https.HttpsError) throw error;
+        throw new functions.https.HttpsError("internal", "都道府県リストの取得中にサーバーでエラーが発生しました。");
+    }
+});
+
+/**
+ * [新規] 画像の一括更新候補を探す関数
+ */
+exports.batchFindImageUpdates = functions.region("asia-northeast1").https.onCall(async (data, context) => {
+    if (!context.auth || !context.auth.token.admin) {
+        throw new functions.https.HttpsError("permission-denied", "この操作には管理者権限が必要です。");
+    }
+
+    const getPrefectureListCallable = httpsCallable(functions, 'getPrefectureList');
+    const prefectureListResult = await getPrefectureListCallable.call(context);
+    const availablePrefectures = prefectureListResult.data;
+
+    let proposedUpdates = [];
+
+    for (const pref of availablePrefectures) {
+        try {
+            const { content: currentJson } = await getGitHubFile(`data/${pref.id}.json`);
+            const spotsToUpdate = currentJson.spots.filter(spot => spot.image && spot.image.includes('placehold.co'));
+
+            for (const spot of spotsToUpdate) {
+                try {
+                    const imageResult = await _fetchImageForSpotLogic({
+                        spot: spot,
+                        prefectureName: spot.prefecture,
+                        reportedImageUrl: null
+                    });
+
+                    if (imageResult.candidates && imageResult.candidates.length > 0) {
+                        const newImage = imageResult.candidates[0];
+                        proposedUpdates.push({
+                            spotName: spot.name,
+                            prefecture: spot.prefecture,
+                            area: spot.area,
+                            oldImageUrl: spot.image,
+                            newImageUrl: newImage.url,
+                            newImageSource: newImage.displayLink,
+                            newImageSourceUrl: newImage.sourceLink,
+                        });
+                    }
+                } catch (spotError) {
+                    console.error(`Error fetching image for spot ${spot.name}:`, spotError);
+                }
+            }
+        } catch (fileError) {
+            console.error(`Error processing file for prefecture ${pref.name}:`, fileError);
+        }
+    }
+
+    return proposedUpdates;
+});
+
+/**
+ * [新規] 承認された画像更新をGitHubに反映させる関数
+ */
+exports.confirmImageUpdates = functions.runWith({ timeoutSeconds: 300 }).region("asia-northeast1").https.onCall(async (data, context) => {
+    if (!context.auth || !context.auth.token.admin) {
+        throw new functions.https.HttpsError("permission-denied", "この操作には管理者権限が必要です。");
+    }
+
+    const { updates } = data;
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+        throw new functions.https.HttpsError("invalid-argument", "更新データがありません。");
+    }
+
+    const prefectureIdMap = await getPrefectureIdMap();
+
+    const updatesByFile = updates.reduce((acc, update) => {
+        const prefId = prefectureIdMap[update.prefecture];
+        if (prefId) {
+            const filePath = `data/${prefId}.json`;
+            if (!acc[filePath]) {
+                acc[filePath] = [];
+            }
+            acc[filePath].push(update);
+        }
+        return acc;
+    }, {});
+
+    let commitCount = 0;
+    for (const filePath in updatesByFile) {
+        try {
+            const fileUpdates = updatesByFile[filePath];
+            const { content: currentJson, sha } = await getGitHubFile(filePath);
+
+            fileUpdates.forEach(update => {
+                const spotIndex = currentJson.spots.findIndex(s => s.name === update.spotName);
+                if (spotIndex !== -1) {
+                    currentJson.spots[spotIndex].image = update.newImageUrl;
+                    currentJson.spots[spotIndex].imageSource = update.newImageSource || "管理者一括更新";
+                    currentJson.spots[spotIndex].imageSourceUrl = update.newImageSourceUrl || update.newImageUrl;
+                }
+            });
+
+            const commitMessage = `fix(images): Batch update images for ${fileUpdates.length} spots in ${filePath}`;
+            await updateGitHubFile(filePath, currentJson, sha, commitMessage);
+            commitCount++;
+        } catch (error) {
+            console.error(`Error updating file ${filePath}:`, error);
+        }
+    }
+
+    return { success: true, message: `${commitCount}個のファイルの画像が更新されました。` };
 });

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VLOG旅プランナー v22.5 (修正依頼機能版)</title>
+    <title>VLOG旅プランナー v24 (画像一括更新機能版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -278,6 +278,25 @@
         #mobile-filter-toggle.open #mobile-filter-toggle-icon {
             transform: rotate(180deg);
         }
+
+        /* Batch Image Update Modal Styles */
+        .update-item-grid {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 1rem;
+        }
+        .update-item-grid img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 0.5rem;
+            border: 1px solid #ddd;
+        }
+        .update-item-arrow {
+            font-size: 2rem;
+            color: #D35400;
+        }
     </style>
 </head>
 <body class="h-full">
@@ -334,7 +353,7 @@
                         <span id="mailbox-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"></span>
                     </button>
                     <button id="user-settings-btn" class="p-2 rounded-full hover:bg-gray-200 transition-colors">
-                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066 2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     </button>
                 </div>
                 <div class="text-center">
@@ -359,8 +378,7 @@
                             <label for="prefecture-filter" class="pl-3 text-sm font-bold text-gray-600">都道府県:</label>
                             <select id="prefecture-filter" class="bg-white border-none rounded-full py-2 px-3 text-sm sm:text-base font-semibold focus:ring-2 focus:ring-orange-500">
                                 <option value="all">すべての都道府県</option>
-                                <option value="tokyo">東京都</option>
-                                <option value="osaka">大阪府</option>
+                                <!-- Options populated dynamically -->
                             </select>
                         </div>
                         <!-- Category Filters -->
@@ -483,6 +501,38 @@
                 </div>
                 <div id="image-report-content" class="hidden flex-grow overflow-y-auto">
                      <div id="image-report-list" class="space-y-4 py-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Batch Image Update Modal -->
+        <div id="batch-image-update-overlay" class="overlay-base z-[52]">
+            <div class="modal-base max-w-4xl w-full max-h-[90vh] flex flex-col p-6">
+                <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                    <h2 class="text-2xl font-bold text-[#D35400]">画像の一括更新</h2>
+                    <button id="batch-update-close-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
+                </div>
+                <p class="text-sm text-gray-600 mb-4 flex-shrink-0">プレースホルダー画像をAIが検索した新しい画像に更新します。更新したい項目にチェックを入れてください。</p>
+                <div id="batch-update-list-container" class="flex-grow overflow-y-auto border-t border-b py-4 my-4">
+                    <!-- Loading state -->
+                    <div id="batch-update-loading" class="text-center py-10">
+                        <div class="w-8 h-8 border-t-2 border-b-2 border-orange-500 rounded-full animate-spin mx-auto"></div>
+                        <p class="mt-4 text-gray-600">更新候補を検索中...</p>
+                    </div>
+                    <!-- Update items will be injected here -->
+                    <div id="batch-update-list" class="hidden space-y-4"></div>
+                </div>
+                <div class="flex-shrink-0">
+                    <div class="flex items-center mb-4">
+                        <input type="checkbox" id="batch-update-select-all" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                        <label for="batch-update-select-all" class="ml-2 block text-sm text-gray-900">すべて選択 / 解除</label>
+                    </div>
+                    <div class="flex justify-end gap-4">
+                        <button id="batch-update-cancel-btn" class="py-2 px-6 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300">キャンセル</button>
+                        <button id="batch-update-confirm-btn" class="py-2 px-6 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                            選択した <span id="batch-update-count">0</span> 件を更新
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -779,7 +829,7 @@
           apiKey: "AIzaSyDe8piUl7dbuR_FAn1pQkUfVtugh5HF4FU", // このキーは公開しても安全です
           authDomain: "studio-gqqbe.firebaseapp.com",
           projectId: "studio-gqqbe",
-          storageBucket: "studio-gqqbe.firebasestorage.app", // ← このように修正
+          storageBucket: "studio-gqqbe.appspot.com",
           messagingSenderId: "369252587708",
           appId: "1:369252587708:web:86f2413bd89967e2a858b9"
         };
@@ -812,19 +862,43 @@
             "グルメ": ["カフェ・喫茶店", "スイーツ", "ご当地グルメ", "B級グルメ", "ランチ", "ディナー", "食べ歩き"]
         };
 
-        // --- Data Loading Function ---
+        // --- MODIFIED Data Loading Function ---
         async function loadAllData() {
             const loadingIndicator = document.getElementById('loading-indicator');
+            const prefectureFilter = document.getElementById('prefecture-filter');
             loadingIndicator.classList.remove('hidden');
             
-            const prefectureFiles = ['data/tokyo.json', 'data/osaka.json'];
+            // 1. Fetch the list of available prefectures from the Cloud Function
+            let availablePrefectures = [];
+            try {
+                const getPrefectureList = httpsCallable(functions, 'getPrefectureList');
+                const result = await getPrefectureList();
+                availablePrefectures = result.data;
+            } catch (error) {
+                console.error("都道府県リストの取得に失敗しました:", error);
+                loadingIndicator.innerHTML = `<p class="text-red-500">都道府県リストの取得に失敗しました。ページを再読み込みしてください。</p>`;
+                return false;
+            }
+
+            // 2. Dynamically populate the prefecture filter dropdown
+            prefectureFilter.innerHTML = '<option value="all">すべての都道府県</option>';
+            availablePrefectures.forEach(pref => {
+                const option = document.createElement('option');
+                option.value = pref.id;
+                option.textContent = pref.name;
+                prefectureFilter.appendChild(option);
+            });
+
+            // 3. Dynamically create the list of files to fetch
+            const prefectureFiles = availablePrefectures.map(p => `data/${p.id}.json`);
+            
+            // 4. Fetch all data files from GitHub
             const localSpots = [];
             supportedPrefectureNames = []; // Reset before loading
             try {
-                // GitHub Raw URLから直接データを取得
-                const owner = 'tatsuya0203'; // GitHubのユーザー名
-                const repo = 'trip-planner'; // GitHubのリポジトリ名
-                const branch = 'main'; // ブランチ名
+                const owner = 'tatsuya0203';
+                const repo = 'trip-planner';
+                const branch = 'main';
 
                 const responses = await Promise.all(prefectureFiles.map(file => 
                     fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${file}?v=${new Date().getTime()}`)
@@ -860,7 +934,8 @@
 
 
         document.addEventListener('DOMContentLoaded', async () => {
-            await loadAllData();
+            const dataLoaded = await loadAllData();
+            if (!dataLoaded) return;
 
             // Get all DOM elements
             const appContainer = document.getElementById('app-container');
@@ -994,12 +1069,22 @@
             const mobileFilterToggle = document.getElementById('mobile-filter-toggle');
             const navContentWrapper = document.getElementById('nav-content-wrapper');
             const mobileFilterToggleText = document.getElementById('mobile-filter-toggle-text');
+            const batchImageUpdateOverlay = document.getElementById('batch-image-update-overlay');
+            const batchUpdateCloseBtn = document.getElementById('batch-update-close-btn');
+            const batchUpdateListContainer = document.getElementById('batch-update-list-container');
+            const batchUpdateLoading = document.getElementById('batch-update-loading');
+            const batchUpdateList = document.getElementById('batch-update-list');
+            const batchUpdateSelectAll = document.getElementById('batch-update-select-all');
+            const batchUpdateCancelBtn = document.getElementById('batch-update-cancel-btn');
+            const batchUpdateConfirmBtn = document.getElementById('batch-update-confirm-btn');
+            const batchUpdateCount = document.getElementById('batch-update-count');
             
             let currentPrefecture = 'all';
             let currentFilters = { category: 'all', area: 'all', tag: 'all' };
             let currentSearchTerm = '';
             let currentSortOrder = 'default';
             let activeImageReportData = {};
+            let proposedImageUpdates = [];
 
             let currentUser = null;
             let localFavorites = [];
@@ -1052,6 +1137,7 @@
                 hideOverlay(modal);
                 hideOverlay(submissionPanelOverlay);
                 hideOverlay(imageCandidateOverlay);
+                hideOverlay(batchImageUpdateOverlay);
 
                 // Show a temporary loading/info message
                 showInfoModal("データを更新しています...");
@@ -1430,7 +1516,8 @@
 
                 // 1. Prefecture Filter
                 if (currentPrefecture !== 'all') {
-                    sourceSpots = sourceSpots.filter(spot => spot.prefecture.includes(prefectureFilter.options[prefectureFilter.selectedIndex].text.replace(/[都府県]/, '')));
+                    const selectedPrefectureName = prefectureFilter.options[prefectureFilter.selectedIndex].text;
+                    sourceSpots = sourceSpots.filter(spot => spot.prefecture === selectedPrefectureName);
                 }
                 
                 // 2. Category Filter (for 'favorites')
@@ -1503,6 +1590,8 @@
                     return;
                 }
 
+                // This part is a simple placeholder. A real implementation might use a library
+                // or more complex CSS to create a visually appealing map line.
                 const mapLine = document.createElement('div');
                 if (currentPrefecture === 'tokyo') {
                     mapLine.className = 'yamanote-line';
@@ -2761,11 +2850,110 @@
                 localStorage.setItem('lastReadAnnouncementTimestamp', latestTimestamp);
             });
 
-            batchUpdateImagesBtn.addEventListener('click', () => {
-                showInfoModal("この機能は現在、GitHub連携システムへの移行に伴い、無効化されています。");
+            // --- Batch Image Update Logic ---
+            batchUpdateImagesBtn.addEventListener('click', async () => {
+                showOverlay(batchImageUpdateOverlay);
+                batchUpdateList.innerHTML = '';
+                batchUpdateList.classList.add('hidden');
+                batchUpdateLoading.classList.remove('hidden');
+                batchUpdateConfirmBtn.disabled = true;
+                batchUpdateCount.textContent = '0';
+                batchUpdateSelectAll.checked = false;
+
+                try {
+                    const batchFindImageUpdatesCallable = httpsCallable(functions, 'batchFindImageUpdates');
+                    const result = await batchFindImageUpdatesCallable();
+                    proposedImageUpdates = result.data;
+                    
+                    batchUpdateLoading.classList.add('hidden');
+                    batchUpdateList.classList.remove('hidden');
+
+                    if (proposedImageUpdates.length === 0) {
+                        batchUpdateList.innerHTML = '<p class="text-center text-gray-500 py-10">更新対象の画像はありませんでした。</p>';
+                        return;
+                    }
+
+                    proposedImageUpdates.forEach((update, index) => {
+                        const item = document.createElement('div');
+                        item.className = 'p-4 border rounded-lg bg-gray-50';
+                        item.innerHTML = `
+                            <div class="flex items-start gap-4">
+                                <input type="checkbox" data-index="${index}" class="batch-update-checkbox mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                <div class="flex-grow">
+                                    <p class="font-bold">${update.spotName}</p>
+                                    <p class="text-sm text-gray-500">${update.prefecture} / ${update.area}</p>
+                                    <div class="update-item-grid mt-2">
+                                        <img src="${update.oldImageUrl}" alt="古い画像" onerror="this.src='https://placehold.co/200x150/ccc/FFF?text=Error'">
+                                        <span class="update-item-arrow">→</span>
+                                        <img src="${update.newImageUrl}" alt="新しい画像" onerror="this.src='https://placehold.co/200x150/ccc/FFF?text=Error'">
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        batchUpdateList.appendChild(item);
+                    });
+
+                } catch (error) {
+                    console.error("Error fetching batch image updates:", error);
+                    batchUpdateLoading.classList.add('hidden');
+                    batchUpdateList.classList.remove('hidden');
+                    batchUpdateList.innerHTML = `<p class="text-center text-red-500 py-10">更新候補の取得に失敗しました。<br>${error.message}</p>`;
+                }
             });
+
+            function updateBatchConfirmButton() {
+                const checkedCount = batchUpdateList.querySelectorAll('.batch-update-checkbox:checked').length;
+                batchUpdateCount.textContent = checkedCount;
+                batchUpdateConfirmBtn.disabled = checkedCount === 0;
+            }
+
+            batchUpdateList.addEventListener('change', (e) => {
+                if (e.target.classList.contains('batch-update-checkbox')) {
+                    updateBatchConfirmButton();
+                }
+            });
+
+            batchUpdateSelectAll.addEventListener('change', (e) => {
+                batchUpdateList.querySelectorAll('.batch-update-checkbox').forEach(checkbox => {
+                    checkbox.checked = e.target.checked;
+                });
+                updateBatchConfirmButton();
+            });
+
+            batchUpdateConfirmBtn.addEventListener('click', async () => {
+                const selectedIndices = Array.from(batchUpdateList.querySelectorAll('.batch-update-checkbox:checked'))
+                    .map(cb => parseInt(cb.dataset.index, 10));
+                
+                if (selectedIndices.length === 0) {
+                    showInfoModal("更新する画像を選択してください。");
+                    return;
+                }
+
+                const updatesToConfirm = selectedIndices.map(index => proposedImageUpdates[index]);
+                
+                showConfirmationModal(
+                    `${selectedIndices.length}件の画像を本当に更新しますか？\nこの操作は元に戻せません。`,
+                    "更新を実行",
+                    "bg-blue-500",
+                    async () => {
+                        hideOverlay(batchImageUpdateOverlay);
+                        showInfoModal("画像の更新処理を開始しました。完了まで数分かかる場合があります...");
+                        try {
+                            const confirmImageUpdatesCallable = httpsCallable(functions, 'confirmImageUpdates');
+                            const result = await confirmImageUpdatesCallable({ updates: updatesToConfirm });
+                            await reloadDataAndRefreshUI(result.data.message || "画像の更新が完了しました。");
+                        } catch (error) {
+                            console.error("Error confirming image updates:", error);
+                            showInfoModal(`画像の更新に失敗しました: ${error.message}`);
+                        }
+                    }
+                );
+            });
+
+            batchUpdateCloseBtn.addEventListener('click', () => hideOverlay(batchImageUpdateOverlay));
+            batchUpdateCancelBtn.addEventListener('click', () => hideOverlay(batchImageUpdateOverlay));
             
-            // --- New/Updated Image Report Logic ---
+            // --- Image Report Logic ---
             reportImageBtn.addEventListener('click', async () => {
                 const spotName = modal.dataset.spotName;
                 const spot = combinedSpots.find(s => s.name === spotName);
