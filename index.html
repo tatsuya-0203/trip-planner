@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VLOG旅プランナー v25 (日本地図対応版)</title>
+    <title>VLOG旅プランナー v26 (メインフィルター地図対応版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -54,7 +54,7 @@
             flex-shrink: 0;
         }
 
-        #map-container {
+        .map-container {
             position: relative;
             width: 100%;
             max-width: 400px;
@@ -75,12 +75,12 @@
             cursor: pointer;
         }
 
-        #japan-map-container {
+        .japan-map-container {
             position: relative;
             max-width: 500px;
             margin: auto;
         }
-        #japan-map-container img {
+        .japan-map-container img {
             width: 100%;
             height: auto;
         }
@@ -102,10 +102,37 @@
             cursor: pointer;
             transition: all 0.2s ease;
         }
-        .prefecture-map-button:hover {
+        .prefecture-map-button:hover, .prefecture-map-button.active {
             background-color: #D35400;
             color: white;
             transform: translate(-50%, -50%) scale(1.1);
+        }
+        .prefecture-map-button.has-updates::after {
+            content: attr(data-count);
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: #ef4444;
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            border: 1px solid white;
+        }
+        .prefecture-map-button.disabled {
+            background-color: #e5e7eb;
+            border-color: #9ca3af;
+            color: #9ca3af;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .prefecture-map-button.disabled:hover {
+            transform: translate(-50%, -50%) scale(1);
         }
 
 
@@ -387,10 +414,13 @@
                         <!-- Prefecture Filter -->
                         <div class="flex items-center gap-2 bg-stone-200 p-1 rounded-full">
                             <label for="prefecture-filter" class="pl-3 text-sm font-bold text-gray-600">都道府県:</label>
-                            <select id="prefecture-filter" class="bg-white border-none rounded-full py-2 px-3 text-sm sm:text-base font-semibold focus:ring-2 focus:ring-orange-500">
+                            <select id="prefecture-filter" class="bg-white border-none rounded-l-full py-2 pl-3 pr-8 text-sm sm:text-base font-semibold focus:ring-2 focus:ring-orange-500 appearance-none">
                                 <option value="all">すべての都道府県</option>
                                 <!-- Options populated dynamically -->
                             </select>
+                            <button id="open-prefecture-map-btn" class="bg-white rounded-r-full py-2 px-3 hover:bg-gray-100 border-l border-gray-300">
+                                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            </button>
                         </div>
                         <!-- Category Filters -->
                         <div id="category-filters" class="flex items-center gap-1 bg-stone-200 p-1 rounded-full">
@@ -548,7 +578,7 @@
             </div>
         </div>
 
-        <!-- MODIFIED: Batch Update Prefecture Select Modal -->
+        <!-- Batch Update Prefecture Select Modal -->
         <div id="batch-update-prefecture-select-overlay" class="overlay-base z-[53]">
             <div class="modal-base max-w-2xl w-full p-6">
                 <div class="flex justify-between items-center mb-4">
@@ -560,13 +590,33 @@
                     <button id="batch-update-prefecture-select-cancel-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
                 </div>
                 
-                <div id="batch-update-prefecture-map-container" class="relative">
+                <div id="batch-update-prefecture-map-container" class="japan-map-container relative">
                     <img src="https://japaclip.com/files/japan-map.png" alt="日本地図" class="w-full h-auto">
                     <!-- Prefecture buttons will be injected here -->
                 </div>
 
                 <div id="batch-update-prefecture-list-container" class="hidden flex flex-col gap-3 max-h-60 overflow-y-auto">
                     <!-- Prefecture list buttons will be injected here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- NEW: Main Prefecture Select Modal -->
+        <div id="prefecture-select-modal-overlay" class="overlay-base z-[53]">
+            <div class="modal-base max-w-2xl w-full p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-[#D35400]">都道府県を選択</h2>
+                     <div id="prefecture-view-switcher" class="view-switcher flex items-center gap-1 bg-gray-200 p-1 rounded-full">
+                        <button data-view="map" class="active filter-btn rounded-full py-1 px-3 text-xs">🗺️ マップ</button>
+                        <button data-view="list" class="filter-btn rounded-full py-1 px-3 text-xs">🗂️ リスト</button>
+                    </div>
+                    <button id="close-prefecture-select-modal-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
+                </div>
+
+                <div id="prefecture-map-container" class="japan-map-container relative">
+                     <img src="https://japaclip.com/files/japan-map.png" alt="日本地図" class="w-full h-auto">
+                </div>
+                <div id="prefecture-list-container" class="hidden flex flex-col gap-3 max-h-60 overflow-y-auto">
                 </div>
             </div>
         </div>
@@ -587,7 +637,7 @@
                 <div id="area-list-container" class="hidden flex-grow overflow-y-auto flex flex-wrap justify-center content-start gap-3 p-4">
                     <!-- Area buttons will be rendered here -->
                 </div>
-                <div id="map-container" class="flex-grow relative">
+                <div id="map-container" class="map-container flex-grow relative">
                     <!-- Map will be rendered here -->
                 </div>
             </div>
@@ -765,18 +815,6 @@
             </div>
         </div>
 
-        <!-- Prefecture Select Modal -->
-        <div id="prefecture-select-overlay" class="overlay-base z-[60]">
-            <div class="modal-base max-w-sm p-6 text-center">
-                <h3 id="prefecture-select-title" class="text-xl font-bold text-gray-800 mb-4"></h3>
-                <p id="prefecture-select-message" class="text-base mb-6"></p>
-                <div id="prefecture-select-buttons" class="flex flex-col gap-3">
-                    <!-- Buttons will be injected here -->
-                </div>
-                <button id="prefecture-select-cancel-btn" class="w-full mt-4 py-2 px-6 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300">キャンセル</button>
-            </div>
-        </div>
-
         <!-- Progress Modal -->
         <div id="progress-overlay" class="overlay-base z-[70]">
             <div class="modal-base max-w-sm p-8 text-center">
@@ -883,7 +921,7 @@
         let combinedSpots = [];
         let supportedPrefectureNames = [];
         let originalJsonData = {}; // To store the original structure for saving
-        let prefectureMapPositions = {}; // NEW: For Japan map positions
+        let prefectureMapPositions = {}; // For Japan map positions
         
         const standardTags = [
             "絶景", "インスタ映え", "レトロ", "おしゃれ", "カワイイ", "ユニーク", "自然・癒し",
@@ -1087,11 +1125,6 @@
             const mailboxList = document.getElementById('mailbox-list');
             const markAllAsReadBtn = document.getElementById('mark-all-as-read-btn');
             const batchUpdateImagesBtn = document.getElementById('batch-update-images-btn');
-            const prefectureSelectOverlay = document.getElementById('prefecture-select-overlay');
-            const prefectureSelectTitle = document.getElementById('prefecture-select-title');
-            const prefectureSelectMessage = document.getElementById('prefecture-select-message');
-            const prefectureSelectButtons = document.getElementById('prefecture-select-buttons');
-            const prefectureSelectCancelBtn = document.getElementById('prefecture-select-cancel-btn');
             const progressOverlay = document.getElementById('progress-overlay');
             const progressMessage = document.getElementById('progress-message');
             const progressBar = document.getElementById('progress-bar');
@@ -1123,14 +1156,22 @@
             const batchUpdateConfirmBtn = document.getElementById('batch-update-confirm-btn');
             const batchUpdateCount = document.getElementById('batch-update-count');
             
-            // New elements for prefecture selection
+            // Batch Update Prefecture Select Modal elements
             const batchUpdatePrefectureSelectOverlay = document.getElementById('batch-update-prefecture-select-overlay');
             const batchUpdateViewSwitcher = document.getElementById('batch-update-view-switcher');
             const batchUpdatePrefectureMapContainer = document.getElementById('batch-update-prefecture-map-container');
             const batchUpdatePrefectureListContainer = document.getElementById('batch-update-prefecture-list-container');
             const batchUpdatePrefectureSelectCancelBtn = document.getElementById('batch-update-prefecture-select-cancel-btn');
+            let batchUpdatePrefectureView = 'map';
 
-            let batchUpdatePrefectureView = 'map'; // 'map' or 'list'
+            // Main Prefecture Select Modal elements
+            const openPrefectureMapBtn = document.getElementById('open-prefecture-map-btn');
+            const prefectureSelectModalOverlay = document.getElementById('prefecture-select-modal-overlay');
+            const prefectureViewSwitcher = document.getElementById('prefecture-view-switcher');
+            const prefectureMapContainer = document.getElementById('prefecture-map-container');
+            const prefectureListContainer = document.getElementById('prefecture-list-container');
+            const closePrefectureSelectModalBtn = document.getElementById('close-prefecture-select-modal-btn');
+            let mainPrefectureSelectView = 'map';
             
             let currentPrefecture = 'all';
             let currentFilters = { category: 'all', area: 'all', tag: 'all' };
@@ -1643,15 +1684,13 @@
                     return;
                 }
 
-                // 線の描画（省略）
-
                 // 「全エリア」ボタンを右下（90%, 90%）に配置
                 const allBtn = document.createElement('button');
                 allBtn.dataset.area = 'all';
                 allBtn.textContent = '全エリア';
-                allBtn.className = `map-area-button ${currentPrefecture}`;
-                allBtn.style.top = '90%';   // ここを変更
-                allBtn.style.left = '90%';  // ここを変更
+                allBtn.className = `map-area-button`;
+                allBtn.style.top = '90%';
+                allBtn.style.left = '90%';
                 if (currentFilters.area === 'all') allBtn.classList.add('active');
                 mapContainer.appendChild(allBtn);
 
@@ -1659,7 +1698,7 @@
                     const button = document.createElement('button');
                     button.dataset.area = area.name;
                     button.textContent = area.name;
-                    button.className = `map-area-button ${currentPrefecture}`;
+                    button.className = `map-area-button`;
                     button.style.top = area.top;
                     button.style.left = area.left;
                     if (currentFilters.area === area.name) button.classList.add('active');
@@ -2949,22 +2988,14 @@
                 }
             };
             
-            const renderBatchUpdatePrefectureMap = () => {
-                // Remove any existing buttons
-                while (batchUpdatePrefectureMapContainer.firstChild) {
-                    if (batchUpdatePrefectureMapContainer.firstChild.tagName !== 'IMG') {
-                        batchUpdatePrefectureMapContainer.removeChild(batchUpdatePrefectureMapContainer.firstChild);
-                    } else {
-                        break; // Stop when we hit the image
-                    }
-                }
-                const existingButtons = batchUpdatePrefectureMapContainer.querySelectorAll('.prefecture-map-button');
+            const renderBatchUpdatePrefectureMap = (counts) => {
+                const mapContainer = batchUpdatePrefectureMapContainer;
+                const existingButtons = mapContainer.querySelectorAll('.prefecture-map-button');
                 existingButtons.forEach(btn => btn.remove());
 
-
                 const options = Array.from(prefectureFilter.options);
-                options.forEach(option => {
-                    if (option.value === 'all') return;
+                for (let i = 1; i < options.length; i++) { // Skip "all"
+                    const option = options[i];
                     const prefId = option.value;
                     const pos = prefectureMapPositions[prefId];
                     if (pos) {
@@ -2975,68 +3006,99 @@
                         btn.dataset.prefectureId = prefId;
                         btn.style.top = pos.top;
                         btn.style.left = pos.left;
-                        batchUpdatePrefectureMapContainer.appendChild(btn);
+
+                        const count = counts[prefId];
+                        if (count > 0) {
+                            btn.classList.add('has-updates');
+                            btn.dataset.count = count;
+                        } else {
+                            btn.classList.add('disabled');
+                            btn.disabled = true;
+                        }
+
+                        mapContainer.appendChild(btn);
                     }
-                });
+                }
             };
 
-            const renderBatchUpdatePrefectureList = () => {
-                batchUpdatePrefectureListContainer.innerHTML = '';
+            const renderBatchUpdatePrefectureList = (counts) => {
+                const listContainer = batchUpdatePrefectureListContainer;
+                listContainer.innerHTML = '';
+                
+                const allCount = Object.values(counts).reduce((sum, count) => sum + count, 0);
                 const allBtn = document.createElement('button');
-                allBtn.className = 'w-full py-2 px-6 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600';
-                allBtn.textContent = 'すべての都道府県';
+                allBtn.className = 'w-full py-2 px-6 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 flex justify-between items-center';
+                allBtn.innerHTML = `<span>すべての都道府県</span> <span class="bg-white text-blue-600 text-xs font-bold px-2 py-0.5 rounded-full">${allCount}</span>`;
                 allBtn.dataset.prefectureId = 'all';
-                batchUpdatePrefectureListContainer.appendChild(allBtn);
+                if (allCount === 0) {
+                    allBtn.disabled = true;
+                    allBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+                listContainer.appendChild(allBtn);
 
                 const options = Array.from(prefectureFilter.options);
                 for (let i = 1; i < options.length; i++) {
                     const option = options[i];
+                    const count = counts[option.value] || 0;
                     const prefBtn = document.createElement('button');
-                    prefBtn.className = 'w-full py-2 px-6 bg-white border border-gray-300 rounded-lg font-semibold hover:bg-gray-100';
-                    prefBtn.textContent = option.textContent;
+                    prefBtn.className = 'w-full py-2 px-6 bg-white border border-gray-300 rounded-lg font-semibold hover:bg-gray-100 flex justify-between items-center';
+                    prefBtn.innerHTML = `<span>${option.textContent}</span> <span class="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">${count}</span>`;
                     prefBtn.dataset.prefectureId = option.value;
-                    batchUpdatePrefectureListContainer.appendChild(prefBtn);
+                    if (count === 0) {
+                        prefBtn.disabled = true;
+                        prefBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    }
+                    listContainer.appendChild(prefBtn);
                 }
             };
 
-            const renderBatchUpdateSelectView = () => {
+            const renderBatchUpdateSelectView = (counts) => {
                 batchUpdateViewSwitcher.querySelectorAll('button').forEach(btn => {
                     btn.classList.toggle('active', btn.dataset.view === batchUpdatePrefectureView);
                 });
                 if (batchUpdatePrefectureView === 'map') {
                     batchUpdatePrefectureMapContainer.classList.remove('hidden');
                     batchUpdatePrefectureListContainer.classList.add('hidden');
-                    renderBatchUpdatePrefectureMap();
+                    renderBatchUpdatePrefectureMap(counts);
                 } else {
                     batchUpdatePrefectureMapContainer.classList.add('hidden');
                     batchUpdatePrefectureListContainer.classList.remove('hidden');
-                    renderBatchUpdatePrefectureList();
+                    renderBatchUpdatePrefectureList(counts);
                 }
             };
 
-            batchUpdateImagesBtn.addEventListener('click', () => {
-                renderBatchUpdateSelectView();
+            batchUpdateImagesBtn.addEventListener('click', async () => {
                 showOverlay(batchUpdatePrefectureSelectOverlay);
+                try {
+                    const getBatchUpdateCounts = httpsCallable(functions, 'getBatchUpdateCounts');
+                    const result = await getBatchUpdateCounts();
+                    renderBatchUpdateSelectView(result.data || {});
+                } catch (error) {
+                    console.error("Error fetching batch update counts:", error);
+                    showInfoModal("更新件数の取得に失敗しました。");
+                    hideOverlay(batchUpdatePrefectureSelectOverlay);
+                }
             });
 
             batchUpdateViewSwitcher.addEventListener('click', (e) => {
                 const button = e.target.closest('button');
                 if (button && button.dataset.view) {
                     batchUpdatePrefectureView = button.dataset.view;
-                    renderBatchUpdateSelectView();
+                    // Re-render with existing counts, no need to fetch again
+                    batchUpdateImagesBtn.click(); // Simple way to re-trigger render with new view
                 }
             });
 
             batchUpdatePrefectureMapContainer.addEventListener('click', (e) => {
                 const button = e.target.closest('button');
-                if (button && button.dataset.prefectureId) {
+                if (button && button.dataset.prefectureId && !button.disabled) {
                     startBatchUpdate(button.dataset.prefectureId);
                 }
             });
 
             batchUpdatePrefectureListContainer.addEventListener('click', (e) => {
                 const button = e.target.closest('button');
-                if (button && button.dataset.prefectureId) {
+                if (button && button.dataset.prefectureId && !button.disabled) {
                     startBatchUpdate(button.dataset.prefectureId);
                 }
             });
@@ -3044,7 +3106,6 @@
             batchUpdatePrefectureSelectCancelBtn.addEventListener('click', () => {
                 hideOverlay(batchUpdatePrefectureSelectOverlay);
             });
-
 
             function updateBatchConfirmButton() {
                 const checkedCount = batchUpdateList.querySelectorAll('.batch-update-checkbox:checked').length;
@@ -3098,6 +3159,100 @@
             batchUpdateCloseBtn.addEventListener('click', () => hideOverlay(batchImageUpdateOverlay));
             batchUpdateCancelBtn.addEventListener('click', () => hideOverlay(batchImageUpdateOverlay));
             
+            // --- Main Prefecture Select Map Logic ---
+            const renderMainPrefectureSelectMap = () => {
+                const mapContainer = prefectureMapContainer;
+                const existingButtons = mapContainer.querySelectorAll('.prefecture-map-button');
+                existingButtons.forEach(btn => btn.remove());
+
+                const options = Array.from(prefectureFilter.options);
+                options.forEach(option => {
+                    const prefId = option.value;
+                    const pos = prefectureMapPositions[prefId];
+                    if (pos) {
+                        const btn = document.createElement('button');
+                        btn.className = 'prefecture-map-button';
+                        btn.textContent = option.textContent.charAt(0);
+                        btn.title = option.textContent;
+                        btn.dataset.prefectureId = prefId;
+                        btn.style.top = pos.top;
+                        btn.style.left = pos.left;
+                        if (prefId === currentPrefecture) {
+                            btn.classList.add('active');
+                        }
+                        mapContainer.appendChild(btn);
+                    }
+                });
+            };
+
+            const renderMainPrefectureSelectList = () => {
+                const listContainer = prefectureListContainer;
+                listContainer.innerHTML = '';
+
+                const options = Array.from(prefectureFilter.options);
+                options.forEach(option => {
+                    const prefBtn = document.createElement('button');
+                    prefBtn.className = 'w-full py-2 px-6 bg-white border border-gray-300 rounded-lg font-semibold hover:bg-gray-100 text-left';
+                    if (option.value === currentPrefecture) {
+                        prefBtn.classList.add('bg-orange-100', 'border-orange-400');
+                    }
+                    prefBtn.textContent = option.textContent;
+                    prefBtn.dataset.prefectureId = option.value;
+                    listContainer.appendChild(prefBtn);
+                });
+            };
+
+            const renderMainPrefectureSelectView = () => {
+                prefectureViewSwitcher.querySelectorAll('button').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.view === mainPrefectureSelectView);
+                });
+                if (mainPrefectureSelectView === 'map') {
+                    prefectureMapContainer.classList.remove('hidden');
+                    prefectureListContainer.classList.add('hidden');
+                    renderMainPrefectureSelectMap();
+                } else {
+                    prefectureMapContainer.classList.add('hidden');
+                    prefectureListContainer.classList.remove('hidden');
+                    renderMainPrefectureSelectList();
+                }
+            };
+
+            openPrefectureMapBtn.addEventListener('click', () => {
+                renderMainPrefectureSelectView();
+                showOverlay(prefectureSelectModalOverlay);
+            });
+
+            closePrefectureSelectModalBtn.addEventListener('click', () => hideOverlay(prefectureSelectModalOverlay));
+
+            prefectureViewSwitcher.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (button && button.dataset.view) {
+                    mainPrefectureSelectView = button.dataset.view;
+                    renderMainPrefectureSelectView();
+                }
+            });
+            
+            const handlePrefectureSelection = (prefId) => {
+                 prefectureFilter.value = prefId;
+                 prefectureFilter.dispatchEvent(new Event('change'));
+                 hideOverlay(prefectureSelectModalOverlay);
+            };
+
+            prefectureMapContainer.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (button && button.dataset.prefectureId) {
+                    handlePrefectureSelection(button.dataset.prefectureId);
+                }
+            });
+
+            prefectureListContainer.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (button && button.dataset.prefectureId) {
+                    handlePrefectureSelection(button.dataset.prefectureId);
+                }
+            });
+
+
             // --- Image Report Logic ---
             reportImageBtn.addEventListener('click', async () => {
                 const spotName = modal.dataset.spotName;

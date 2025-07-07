@@ -225,13 +225,56 @@ URL: ${imageUrl}`;
 };
 
 /**
+ * [NEW] AIが画像の更新が必要か判断するヘルパー関数
+ */
+const shouldUpdateImage = async (spot) => {
+    if (!spot.image || spot.image.trim() === '') {
+        return true;
+    }
+    const prompt = `あなたは画像の品質評価者です。以下のスポット情報を見て、そのスポットの画像 (spot.image) を新しいものに更新すべきかどうかを判断してください。
+
+# 判断基準
+- 画像が明らかにプレースホルダーである場合（例: URLに "placehold.co", "dummyimage.com" が含まれる、画像内に "No Image", "画像なし" と書かれているなど）。
+- 画像の解像度が著しく低い、または画質が非常に悪い場合。
+- 画像がスポットと全く関係ないものである場合。
+- 上記以外の場合は更新する必要はありません。
+
+# スポット情報
+${JSON.stringify(spot, null, 2)}
+
+# 回答
+更新すべきであれば "yes"、その必要がなければ "no" とだけ回答してください。`;
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        });
+        if (!response.ok) {
+            console.error(`AI image update check failed for ${spot.name}: ${response.status}`);
+            return false; // 安全のため、AIチェックが失敗した場合は更新しない
+        }
+        const result = await response.json();
+        const text = result.candidates[0]?.content?.parts[0]?.text.trim().toLowerCase();
+        console.log(`AI check for ${spot.name} (Image: ${spot.image}): Should update? -> ${text}`);
+        return text === "yes";
+    } catch (error) {
+        console.error(`AI画像更新チェック中にエラー (${spot.name}):`, error);
+        return false; // 安全のため、エラー時も更新しない
+    }
+};
+
+
+/**
  * [内部ヘルパー] スポットの画像候補を検索するロジック
  */
 const _fetchImageForSpotLogic = async ({ spot, prefectureName, reportedImageUrl }) => {
     if (!GOOGLE_SEARCH_KEY || !GOOGLE_SEARCH_ID) {
         console.error("Google Search APIキーが設定されていません。"); throw new functions.https.HttpsError("internal", "検索APIキーが設定されていません。");
     }
-    const query = `${spot.name} ${prefectureName} ${spot.area}`;
+    // 検索クエリを「スポット名 公式」に変更
+    const query = `${spot.name} 公式`;
     const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_SEARCH_KEY}&cx=${GOOGLE_SEARCH_ID}&q=${encodeURIComponent(query)}&searchType=image&num=10`;
     
     try {
@@ -535,7 +578,15 @@ exports.batchFindImageUpdates = functions.runWith({ timeoutSeconds: 540 }).regio
         for (const pref of prefecturesToProcess) {
             try {
                 const { content: currentJson } = await getGitHubFile(`data/${pref.id}.json`);
-                const spotsToUpdate = currentJson.spots.filter(spot => spot.image && spot.image.includes('placehold.co'));
+                
+                // AIを使って更新が必要なスポットを判断
+                const updateChecks = currentJson.spots.map(spot => 
+                    shouldUpdateImage(spot).then(shouldUpdate => {
+                        return shouldUpdate ? spot : null;
+                    })
+                );
+                const checkResults = await Promise.all(updateChecks);
+                const spotsToUpdate = checkResults.filter(spot => spot !== null);
 
                 for (const spot of spotsToUpdate) {
                     try {
