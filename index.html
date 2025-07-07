@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VLOG旅プランナー v19.5 (権限エラー対応版)</title>
+    <title>VLOG旅プランナー v22.5 (修正依頼機能版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,12 +30,16 @@
         }
         .card {
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            cursor: pointer;
         }
         .card:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 20px rgba(0,0,0,0.1);
         }
-        .card-content { cursor: pointer; }
+        .card-content { cursor: default; }
+        .favorite-btn, .add-to-plan-btn {
+            cursor: pointer;
+        }
         
         .tag-btn {
             background-color: #F5F5F5;
@@ -106,7 +110,6 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            cursor: pointer;
             transition: all 0.2s ease;
             z-index: 10;
         }
@@ -150,21 +153,51 @@
             padding: 0.25rem;
         }
 
-        .filter-overlay {
+        /* --- Overlay/Modal Base Styles --- */
+        .overlay-base {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 50;
             opacity: 0;
             visibility: hidden;
             transition: opacity 0.3s ease, visibility 0.3s ease;
         }
-        .filter-overlay.visible {
+        .overlay-base.visible {
             opacity: 1;
             visibility: visible;
         }
-        .filter-modal {
+        .modal-base {
+            background-color: white;
+            border-radius: 1rem; /* 16px */
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
             transform: translateY(20px);
             transition: transform 0.3s ease;
+            width: 100%;
         }
-        .filter-overlay.visible .filter-modal {
+        .overlay-base.visible .modal-base {
             transform: translateY(0);
+        }
+        
+        /* --- Spot Detail Modal Specific Styles --- */
+        #modal.overlay-base {
+            align-items: flex-start; /* Align to top */
+            padding: 2.5rem 1rem; /* 40px 16px */
+        }
+        #modal-content.modal-base {
+            max-width: 56rem; /* 896px */
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 1.5rem; /* 24px */
+        }
+        @media (min-width: 640px) {
+            #modal-content.modal-base { padding: 2rem; } /* 32px */
+        }
+        @media (min-width: 768px) {
+            #modal-content.modal-base { padding: 2.5rem; } /* 40px */
         }
 
         .move-handle {
@@ -181,6 +214,7 @@
             border-radius: 50%;
             object-fit: cover;
             border: 2px solid #D35400;
+            cursor: pointer;
         }
         
         .role-badge {
@@ -200,6 +234,11 @@
         .cropper-view-box,
         .cropper-face {
             border-radius: 50%;
+        }
+        
+        .candidate-image-wrapper.selected {
+            border-color: #3b82f6; /* blue-500 */
+            background-color: #eff6ff; /* blue-50 */
         }
 
         /* Styles for Admin Edit Form */
@@ -234,17 +273,22 @@
                 -webkit-box-orient: vertical;
             }
         }
+        
+        /* Mobile filter toggle icon rotation */
+        #mobile-filter-toggle.open #mobile-filter-toggle-icon {
+            transform: rotate(180deg);
+        }
     </style>
 </head>
 <body class="h-full">
 
     <!-- Login/Signup Modal -->
-    <div id="auth-modal" class="fixed inset-0 bg-gray-900 bg-opacity-80 z-50 flex justify-center items-center">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+    <div id="auth-modal" class="overlay-base visible">
+        <div class="modal-base p-6 sm:p-8 max-w-sm text-center">
             <h2 id="auth-title" class="text-2xl font-bold text-[#D35400] mb-4">ログイン</h2>
             <p id="auth-error" class="text-red-500 text-sm mb-4 h-5"></p>
             <div class="space-y-4">
-                <input type="text" id="display-name-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg hidden" placeholder="ユーザー名">
+                <input type="text" id="display-name-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="ユーザー名">
                 <input type="email" id="email-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="メールアドレス">
                 <div class="relative">
                     <input type="password" id="password-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="パスワード">
@@ -271,8 +315,8 @@
 
     <div id="app-container" class="hidden">
         <div id="app" class="container mx-auto p-4 md:p-8 flex flex-col h-full">
-            <header id="app-header" class="text-center mb-4 flex-shrink-0">
-                <div class="flex justify-end items-center gap-4 absolute top-4 right-4">
+            <header class="mb-4 sm:mb-8 flex-shrink-0">
+                <div class="flex justify-center sm:justify-end items-center gap-2 flex-wrap mb-4">
                     <div id="admin-controls" class="hidden items-center gap-2">
                         <button id="open-submission-panel-btn" class="p-2 rounded-full hover:bg-gray-200 transition-colors relative">
                             <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
@@ -293,12 +337,22 @@
                         <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     </button>
                 </div>
-                <h1 class="text-3xl md:text-5xl font-bold text-[#D35400] pt-16 md:pt-0">VLOG旅プランナー</h1>
-                <p class="mt-2 md:mt-4 text-base md:text-lg text-gray-600">専門学生のための究極ガイドをインタラクティブに体験！</p>
+                <div class="text-center">
+                    <h1 class="text-4xl md:text-5xl font-bold text-[#D35400]">VLOG旅プランナー</h1>
+                    <p class="mt-2 md:mt-4 text-base md:text-lg text-gray-600">専門学生のための究極ガイドをインタラクティブに体験！</p>
+                </div>
             </header>
 
-            <nav id="app-nav" class="bg-white/70 backdrop-blur-md sticky top-4 z-20 p-4 rounded-xl shadow-lg mb-6 flex-shrink-0">
-                <div class="space-y-4">
+            <nav id="app-nav" class="bg-white/70 backdrop-blur-md sticky top-4 z-20 p-2 sm:p-4 rounded-xl shadow-lg mb-6 flex-shrink-0">
+                <!-- Mobile Filter Toggle Button -->
+                <div class="md:hidden text-center mb-4">
+                    <button id="mobile-filter-toggle" class="w-full bg-white py-2 px-4 border border-gray-300 rounded-full shadow-sm font-semibold text-gray-700 flex items-center justify-center">
+                        <span id="mobile-filter-toggle-text">フィルターと検索を開く</span>
+                        <svg id="mobile-filter-toggle-icon" class="inline-block w-4 h-4 ml-2 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                </div>
+                
+                <div id="nav-content-wrapper" class="hidden md:block space-y-4">
                     <div class="flex flex-wrap justify-center gap-2">
                         <!-- Prefecture Filter -->
                         <div class="flex items-center gap-2 bg-stone-200 p-1 rounded-full">
@@ -317,7 +371,26 @@
                             <button data-filter="favorites" class="filter-btn rounded-full py-2 px-3 sm:px-5 text-xs sm:text-base font-semibold transition-all duration-300">❤️ お気に入り</button>
                         </div>
                     </div>
-                    <div class="flex items-center justify-center gap-2 border-t pt-4">
+                    <!-- Search and Sort Controls -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+                        <div class="relative">
+                            <input type="text" id="search-input" placeholder="スポット名で検索..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-orange-500">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
+                            </div>
+                            <div id="search-suggestions" class="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg hidden"></div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label for="sort-order" class="text-sm font-bold text-gray-600">並び替え:</label>
+                            <select id="sort-order" class="bg-white border-gray-300 rounded-full py-2 px-3 text-sm sm:text-base font-semibold focus:ring-2 focus:ring-orange-500 w-full">
+                                <option value="default">追加順（新しい順）</option>
+                                <option value="default-desc">追加順（古い順）</option>
+                                <option value="name-asc">あいうえお順</option>
+                                <option value="name-desc">あいうえお順（逆）</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-center gap-2 border-t pt-4 flex-wrap">
                         <button id="open-area-filter-btn" class="w-full sm:w-auto text-sm font-semibold bg-blue-100 text-blue-800 py-2 px-4 rounded-full hover:bg-blue-200 transition-colors disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed" disabled>🗺️ エリアで絞り込み</button>
                         <button id="open-tag-filter-btn" class="w-full sm:w-auto text-sm font-semibold bg-teal-100 text-teal-800 py-2 px-4 rounded-full hover:bg-teal-200 transition-colors"># タグで絞り込み</button>
                         <button id="add-spot-btn" class="w-full sm:w-auto text-sm font-semibold bg-green-100 text-green-800 py-2 px-4 rounded-full hover:bg-green-200 transition-colors">✨ スポットを追加</button>
@@ -341,8 +414,8 @@
         </div>
 
         <!-- Add Spot Modal -->
-        <div id="add-spot-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div id="add-spot-overlay" class="overlay-base">
+            <div class="modal-base max-w-md p-6 overflow-hidden">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold text-[#D35400]">新しいスポットを提案</h2>
                     <button id="close-add-spot-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
@@ -362,8 +435,8 @@
         </div>
 
         <!-- Re-analysis Modal -->
-        <div id="re-analysis-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-[51] flex items-center justify-center p-4">
-            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div id="re-analysis-overlay" class="overlay-base z-[51]">
+            <div class="modal-base max-w-md p-6 overflow-hidden">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold text-[#D35400]">都道府県の再分析</h2>
                     <button id="close-re-analysis-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
@@ -382,13 +455,13 @@
         </div>
 
         <!-- Submission Panel -->
-        <div id="submission-panel-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col p-6">
-                <div class="flex justify-between items-center mb-4">
+        <div id="submission-panel-overlay" class="overlay-base">
+            <div class="modal-base max-w-4xl max-h-[85vh] flex flex-col p-4 sm:p-6 overflow-hidden">
+                <div class="flex justify-between items-center mb-4 flex-shrink-0">
                     <h2 class="text-2xl font-bold text-[#D35400]">提案の管理</h2>
                     <button id="close-submission-panel-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
                 </div>
-                <div id="submission-tabs" class="border-b border-gray-200 mb-4">
+                <div id="submission-tabs" class="border-b border-gray-200 mb-4 flex-shrink-0">
                     <nav class="flex space-x-4" aria-label="Tabs">
                         <button data-tab="submissions" class="tab-btn active px-3 py-2 font-medium text-sm rounded-t-lg">
                             スポット提案
@@ -399,24 +472,24 @@
                         </button>
                     </nav>
                 </div>
-                <div id="submission-content">
+                <div id="submission-content" class="flex-grow overflow-y-auto">
                     <div id="admin-tools" class="mb-4 p-3 bg-gray-100 rounded-lg border">
                         <h3 class="font-bold text-gray-700 mb-2">管理者用ツール</h3>
                         <button id="batch-update-images-btn" class="text-sm font-semibold bg-indigo-100 text-indigo-800 py-2 px-4 rounded-full hover:bg-indigo-200 transition-colors">
                             🖼️ 全スポットの画像を更新
                         </button>
                     </div>
-                    <div id="submission-list" class="flex-grow overflow-y-auto space-y-4 py-4"></div>
+                    <div id="submission-list" class="space-y-4 py-4"></div>
                 </div>
-                <div id="image-report-content" class="hidden">
-                     <div id="image-report-list" class="flex-grow overflow-y-auto space-y-4 py-4"></div>
+                <div id="image-report-content" class="hidden flex-grow overflow-y-auto">
+                     <div id="image-report-list" class="space-y-4 py-4"></div>
                 </div>
             </div>
         </div>
 
         <!-- Area Filter Overlay -->
-        <div id="area-filter-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col p-6">
+        <div id="area-filter-overlay" class="overlay-base">
+            <div class="modal-base max-w-4xl max-h-[85vh] flex flex-col p-4 sm:p-6 overflow-hidden">
                 <div class="flex justify-between items-center mb-4">
                          <div class="flex items-center gap-4">
                              <h2 class="text-2xl font-bold text-[#D35400]">エリアを選択</h2>
@@ -437,8 +510,8 @@
         </div>
 
         <!-- Tag Filter Overlay -->
-        <div id="tag-filter-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-              <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col p-6">
+        <div id="tag-filter-overlay" class="overlay-base">
+              <div class="modal-base max-w-4xl max-h-[85vh] flex flex-col p-4 sm:p-6 overflow-hidden">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold text-[#D35400]">タグを選択</h2>
                     <button id="close-tag-filter-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
@@ -448,8 +521,8 @@
         </div>
 
         <!-- User Settings Modal -->
-        <div id="user-settings-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div id="user-settings-overlay" class="overlay-base">
+            <div class="modal-base max-w-md p-6 overflow-hidden">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold text-[#D35400]">ユーザー設定</h2>
                     <button id="close-user-settings-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
@@ -484,8 +557,8 @@
         </div>
 
         <!-- Image Cropper Modal -->
-        <div id="cropper-overlay" class="filter-overlay fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+        <div id="cropper-overlay" class="overlay-base z-[60]">
+            <div class="modal-base max-w-lg p-6 overflow-hidden">
                 <h2 class="text-2xl font-bold text-[#D35400] mb-4">アイコンを編集</h2>
                 <div id="cropper-image-container" class="mb-4 bg-gray-200">
                     <img id="cropper-image" src="">
@@ -501,8 +574,8 @@
         </div>
 
         <!-- Confirmation Modal -->
-        <div id="confirmation-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-              <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+        <div id="confirmation-overlay" class="overlay-base z-[55]">
+              <div class="modal-base max-w-sm p-6 text-center">
                 <p id="confirmation-message" class="text-lg mb-6"></p>
                 <div class="flex justify-center gap-4">
                     <button id="confirm-cancel-btn" class="py-2 px-6 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300">キャンセル</button>
@@ -512,16 +585,16 @@
         </div>
         
         <!-- Info Modal -->
-        <div id="info-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+        <div id="info-overlay" class="overlay-base z-[55]">
+            <div class="modal-base max-w-sm p-6 text-center">
                 <p id="info-message" class="text-lg mb-6"></p>
                 <button id="info-ok-btn" class="py-2 px-10 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600">OK</button>
             </div>
         </div>
 
         <!-- Cross-Prefecture Confirmation Modal -->
-        <div id="cross-prefecture-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center">
+        <div id="cross-prefecture-overlay" class="overlay-base">
+            <div class="modal-base max-w-md p-6 text-center">
                 <h3 class="text-xl font-bold text-gray-800 mb-2">プラン確認</h3>
                 <p id="cross-prefecture-message" class="text-base mb-6"></p>
                 <div class="flex flex-col gap-3">
@@ -533,11 +606,11 @@
         </div>
 
         <!-- Main Content Modal -->
-        <div id="modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-start pt-10 p-4 hidden opacity-0 transition-opacity duration-300 ease-in-out" data-spot-name="">
-            <div id="modal-content" class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto transform opacity-0 -translate-y-12 transition-all duration-300 ease-in-out">
-                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-8">
+        <div id="modal" class="overlay-base" data-spot-name="">
+            <div id="modal-content" class="modal-base">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="relative">
-                        <img id="modal-image" src="" alt="スポットの画像" class="w-full h-auto rounded-lg shadow-md object-cover aspect-video" onerror="this.onerror=null;this.src='https://placehold.co/600x400/E57373/FFF?text=Image+Not+Found';">
+                        <img id="modal-image" src="" alt="スポットの画像" class="w-full h-auto rounded-lg shadow-md object-cover aspect-video cursor-pointer" onerror="this.onerror=null;this.src='https://placehold.co/600x400/E57373/FFF?text=Image+Not+Found';">
                         <div id="modal-image-spinner" class="absolute inset-0 flex items-center justify-center bg-gray-200 rounded-lg hidden">
                             <div class="w-8 h-8 border-t-2 border-b-2 border-orange-500 rounded-full animate-spin"></div>
                         </div>
@@ -572,7 +645,7 @@
         </button>
 
         <div id="my-plan-panel-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden"></div>
-        <div id="my-plan-panel" class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-40 transform translate-x-full p-6 flex flex-col">
+        <div id="my-plan-panel" class="fixed top-0 right-0 h-full w-full sm:w-11/12 max-w-md bg-white shadow-2xl z-40 transform translate-x-full p-6 flex flex-col">
             <div class="flex-shrink-0 flex justify-between items-center pb-4 border-b">
                 <h2 id="my-plan-title" class="text-2xl font-bold text-[#D35400]">マイプラン</h2>
                 <button id="my-plan-close-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
@@ -597,7 +670,7 @@
 
         <!-- Mailbox Panel -->
         <div id="mailbox-panel-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden"></div>
-        <div id="mailbox-panel" class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-40 transform translate-x-full p-6 flex flex-col">
+        <div id="mailbox-panel" class="fixed top-0 right-0 h-full w-full sm:w-11/12 max-w-md bg-white shadow-2xl z-40 transform translate-x-full p-6 flex flex-col">
             <div class="flex-shrink-0 flex justify-between items-center pb-4 border-b">
                 <h2 class="text-2xl font-bold text-[#D35400]">お知らせ</h2>
                 <button id="mailbox-close-btn" class="text-3xl font-light text-gray-500 hover:text-gray-900 transition">×</button>
@@ -609,8 +682,8 @@
         </div>
 
         <!-- Prefecture Select Modal -->
-        <div id="prefecture-select-overlay" class="filter-overlay fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
-            <div class="filter-modal bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+        <div id="prefecture-select-overlay" class="overlay-base z-[60]">
+            <div class="modal-base max-w-sm p-6 text-center">
                 <h3 id="prefecture-select-title" class="text-xl font-bold text-gray-800 mb-4"></h3>
                 <p id="prefecture-select-message" class="text-base mb-6"></p>
                 <div id="prefecture-select-buttons" class="flex flex-col gap-3">
@@ -621,8 +694,8 @@
         </div>
 
         <!-- Progress Modal -->
-        <div id="progress-overlay" class="filter-overlay fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
+        <div id="progress-overlay" class="overlay-base z-[70]">
+            <div class="modal-base max-w-sm p-8 text-center">
                 <h3 id="progress-title" class="text-xl font-bold text-gray-800 mb-2">処理中です...</h3>
                 <p id="progress-message" class="text-base mb-4"></p>
                 <div class="w-full bg-gray-200 rounded-full h-2.5">
@@ -630,6 +703,33 @@
                 </div>
             </div>
         </div>
+
+        <!-- Image Viewer Modal -->
+        <div id="image-viewer-overlay" class="overlay-base z-[60] p-4">
+            <div class="w-full h-full flex items-center justify-center">
+                <img id="image-viewer-img" src="" alt="拡大画像" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
+            </div>
+        </div>
+        
+        <!-- Image Candidate Selection Modal -->
+        <div id="image-candidate-overlay" class="overlay-base z-[52]">
+            <div class="modal-base max-w-2xl p-6">
+                <h2 class="text-2xl font-bold text-[#D35400] mb-4">新しい画像を選択してください</h2>
+                <p class="text-sm text-gray-600 mb-4">AIが取得した画像候補です。スポットに最も適した画像を1つ選択してください。</p>
+                <div id="image-candidate-list" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 min-h-[10rem]">
+                    <!-- Candidates will be injected here -->
+                </div>
+                <div id="image-candidate-loading" class="text-center py-10 hidden">
+                    <div class="w-8 h-8 border-t-2 border-b-2 border-orange-500 rounded-full animate-spin mx-auto"></div>
+                    <p class="mt-4 text-gray-600">AIで画像候補を検索中...</p>
+                </div>
+                <div class="flex justify-end gap-4">
+                    <button id="image-candidate-cancel-btn" class="py-2 px-6 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300">キャンセル</button>
+                    <button id="image-candidate-confirm-btn" class="py-2 px-6 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>この画像に決定</button>
+                </div>
+            </div>
+        </div>
+
     </div>
     
     <textarea id="copy-textarea" class="absolute -left-full"></textarea>
@@ -721,12 +821,23 @@
             const localSpots = [];
             supportedPrefectureNames = []; // Reset before loading
             try {
-                const responses = await Promise.all(prefectureFiles.map(file => fetch(`${file}?v=${new Date().getTime()}`)));
-                const jsonDataArray = await Promise.all(responses.map(res => res.json()));
+                // GitHub Raw URLから直接データを取得
+                const owner = 'tatsuya0203'; // GitHubのユーザー名
+                const repo = 'trip-planner'; // GitHubのリポジトリ名
+                const branch = 'main'; // ブランチ名
+
+                const responses = await Promise.all(prefectureFiles.map(file => 
+                    fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${file}?v=${new Date().getTime()}`)
+                ));
+
+                const jsonDataArray = await Promise.all(responses.map(res => {
+                    if (!res.ok) throw new Error(`Failed to fetch ${res.url}: ${res.statusText}`);
+                    return res.json();
+                }));
                 
                 jsonDataArray.forEach((data, index) => {
                     const prefectureId = prefectureFiles[index].split('/')[1].replace('.json', '');
-                    originalJsonData[prefectureId] = data; // Store original full structure
+                    originalJsonData[prefectureId] = data; 
                     allSpotsData[prefectureId] = data.spots;
                     areaPositions[prefectureId] = data.areaPositions;
                     allTransitData[prefectureId] = data.transitData;
@@ -736,7 +847,7 @@
                     }
                 });
             } catch (error) {
-                console.error("ローカルデータの読み込みに失敗しました:", error);
+                console.error("GitHubからのデータ読み込みに失敗しました:", error);
                 loadingIndicator.innerHTML = `<p class="text-red-500">データの読み込みに失敗しました。ページを再読み込みしてください。</p>`;
                 return false;
             }
@@ -871,9 +982,25 @@
             const imageReportList = document.getElementById('image-report-list');
             const imageReportBadge = document.getElementById('image-report-badge');
             const reportImageBtn = document.getElementById('report-image-btn');
+            const searchInput = document.getElementById('search-input');
+            const sortOrder = document.getElementById('sort-order');
+            const imageViewerOverlay = document.getElementById('image-viewer-overlay');
+            const imageViewerImg = document.getElementById('image-viewer-img');
+            const imageCandidateOverlay = document.getElementById('image-candidate-overlay');
+            const imageCandidateList = document.getElementById('image-candidate-list');
+            const imageCandidateLoading = document.getElementById('image-candidate-loading');
+            const imageCandidateConfirmBtn = document.getElementById('image-candidate-confirm-btn');
+            const imageCandidateCancelBtn = document.getElementById('image-candidate-cancel-btn');
+            const mobileFilterToggle = document.getElementById('mobile-filter-toggle');
+            const navContentWrapper = document.getElementById('nav-content-wrapper');
+            const mobileFilterToggleText = document.getElementById('mobile-filter-toggle-text');
             
             let currentPrefecture = 'all';
             let currentFilters = { category: 'all', area: 'all', tag: 'all' };
+            let currentSearchTerm = '';
+            let currentSortOrder = 'default';
+            let activeImageReportData = {};
+
             let currentUser = null;
             let localFavorites = [];
             let localPlan = [];
@@ -892,26 +1019,63 @@
             let pendingReAnalysisData = null;
             let pendingSpotSubmissionsCount = 0;
             let pendingImageReportsCount = 0;
+
+            function toggleBodyScroll(lock) {
+                document.body.classList.toggle('overflow-hidden', lock);
+            }
+
+            function showOverlay(overlayElement) {
+                overlayElement.classList.add('visible');
+                toggleBodyScroll(true);
+            }
+
+            function hideOverlay(overlayElement) {
+                overlayElement.classList.remove('visible');
+                // Check if any other overlays are still visible before unlocking scroll
+                const isAnyOverlayVisible = document.querySelector('.overlay-base.visible');
+                if (!isAnyOverlayVisible) {
+                    toggleBodyScroll(false);
+                }
+            }
             
             function showInfoModal(message) {
                 infoMessage.textContent = message;
-                infoOverlay.classList.add('visible');
+                showOverlay(infoOverlay);
             }
-            infoOkBtn.addEventListener('click', () => infoOverlay.classList.remove('visible'));
+            infoOkBtn.addEventListener('click', () => hideOverlay(infoOverlay));
             infoOverlay.addEventListener('click', (e) => {
-                if (e.target === infoOverlay) infoOverlay.classList.remove('visible');
+                if (e.target === infoOverlay) hideOverlay(infoOverlay);
             });
+            
+            async function reloadDataAndRefreshUI(successMessage) {
+                // Close any open modals to avoid stale data display
+                hideOverlay(modal);
+                hideOverlay(submissionPanelOverlay);
+                hideOverlay(imageCandidateOverlay);
+
+                // Show a temporary loading/info message
+                showInfoModal("データを更新しています...");
+
+                await loadAllData(); // Re-fetch from GitHub
+                renderAll(); // Re-render the entire UI with new data
+
+                // Show the final success message
+                // Use a short timeout to ensure the user sees the "updating" message first
+                setTimeout(() => {
+                    showInfoModal(successMessage);
+                }, 300);
+            }
 
             onAuthStateChanged(auth, user => {
                 if (user) {
                     currentUser = user;
                     viewedUserId = user.uid;
-                    authModal.classList.add('hidden');
+                    hideOverlay(authModal);
                     appContainer.classList.remove('hidden');
                     initAppForUser(user);
                 } else {
                     currentUser = null;
-                    authModal.classList.remove('hidden');
+                    showOverlay(authModal);
                     appContainer.classList.add('hidden');
                     adminControls.classList.add('hidden');
                     if (unsubscribeSpotSubmissions) unsubscribeSpotSubmissions();
@@ -1069,13 +1233,6 @@
                         console.log("カスタムクレームの確認中にエラー（一般ユーザーの場合は正常）:", error.message);
                         adminControls.classList.add('hidden');
                     });
-
-                if (unsubscribeFavorites) unsubscribeFavorites();
-                const favDocRef = doc(db, "favorites", user.uid);
-                unsubscribeFavorites = onSnapshot(favDocRef, (docSnap) => {
-                    localFavorites = docSnap.exists() ? docSnap.data().spots || [] : [];
-                    renderAll();
-                });
                 
                 if (unsubscribeMailbox) unsubscribeMailbox();
                 if (unsubscribeAnnouncements) unsubscribeAnnouncements();
@@ -1125,7 +1282,8 @@
 
             async function viewUserPlan(userId, userName) {
                 if (unsubscribePlan) unsubscribePlan();
-                
+                if (unsubscribeFavorites) unsubscribeFavorites();
+
                 viewedUserId = userId;
                 
                 const isViewingOwnPlan = currentUser.uid === viewedUserId;
@@ -1142,10 +1300,24 @@
                          planItemsList.innerHTML = `<p class="text-red-500 text-center py-10">このユーザーのプランを閲覧する権限がありません。</p>`;
                     }
                 });
+
+                const favDocRef = doc(db, "favorites", viewedUserId);
+                unsubscribeFavorites = onSnapshot(favDocRef, (docSnap) => {
+                    localFavorites = docSnap.exists() ? docSnap.data().spots || [] : [];
+                    renderAll();
+                }, (error) => {
+                    console.error("お気に入りの読み込みエラー:", error);
+                    localFavorites = [];
+                    renderAll();
+                });
             }
             
             async function toggleFavorite(spotName) {
-                if (!currentUser) return;
+                if (!currentUser || currentUser.uid !== viewedUserId) {
+                    showInfoModal("他のユーザーのお気に入りは変更できません。");
+                    return;
+                };
+
                 const favDocRef = doc(db, "favorites", currentUser.uid);
                 const newFavorites = localFavorites.includes(spotName)
                     ? localFavorites.filter(name => name !== spotName)
@@ -1162,7 +1334,10 @@
             }
 
             async function addToPlan(spotName) {
-                if (!currentUser || viewedUserId !== currentUser.uid) return;
+                if (!currentUser || viewedUserId !== currentUser.uid) {
+                    showInfoModal("他のユーザーのプランには追加できません。");
+                    return;
+                }
                 if (localPlan.includes(spotName)) return;
 
                 const spotToAdd = combinedSpots.find(s => s.name === spotName);
@@ -1208,10 +1383,8 @@
                 const isInPlan = localPlan.includes(spot.name);
                 
                 card.innerHTML = `
-                    <div class="absolute top-0 right-0 p-2 z-10 flex flex-col items-end gap-2">
-                        <div class="favorite-btn ${isFavorited ? 'favorited' : ''}" title="お気に入りに追加">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                        </div>
+                    <div class="favorite-btn ${isFavorited ? 'favorited' : ''}" title="お気に入りに追加">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
                     </div>
                     <div class="card-content p-5 pt-3 flex flex-col flex-grow">
                         <div class="flex-grow">
@@ -1234,11 +1407,15 @@
                     </div>
                 `;
                 
-                card.querySelector('.card-content').addEventListener('click', (e) => {
-                   if (!e.target.closest('.add-to-plan-btn')) openModal(spot);
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('.favorite-btn') || e.target.closest('.add-to-plan-btn')) {
+                        return;
+                    }
+                    openModal(spot);
                 });
 
                 card.querySelector('.favorite-btn').addEventListener('click', () => toggleFavorite(spot.name));
+                
                 const addToPlanBtn = card.querySelector('.add-to-plan-btn');
                 if (!isInPlan) {
                     addToPlanBtn.addEventListener('click', () => addToPlan(spot.name));
@@ -1246,26 +1423,55 @@
                 
                 return card;
             }
-
+            
             function renderSpots() {
                 spotsList.innerHTML = '';
                 let sourceSpots = combinedSpots;
 
+                // 1. Prefecture Filter
                 if (currentPrefecture !== 'all') {
                     sourceSpots = sourceSpots.filter(spot => spot.prefecture.includes(prefectureFilter.options[prefectureFilter.selectedIndex].text.replace(/[都府県]/, '')));
                 }
                 
+                // 2. Category Filter (for 'favorites')
                 if (currentFilters.category === 'favorites') {
                     sourceSpots = sourceSpots.filter(spot => localFavorites.includes(spot.name));
                 }
 
-                const filteredSpots = sourceSpots.filter(spot => {
+                // 3. Main Filters (Category, Area, Tag)
+                let filteredSpots = sourceSpots.filter(spot => {
                     const categoryMatch = currentFilters.category === 'all' || currentFilters.category === 'favorites' || spot.category === currentFilters.category;
                     const areaMatch = currentFilters.area === 'all' || spot.area === currentFilters.area;
                     const tagMatch = currentFilters.tag === 'all' || (spot.tags && spot.tags.includes(currentFilters.tag));
                     return categoryMatch && areaMatch && tagMatch;
                 });
-                
+
+                // 4. Search Filter
+                if (currentSearchTerm) {
+                    filteredSpots = filteredSpots.filter(spot => 
+                        spot.name.toLowerCase().includes(currentSearchTerm)
+                    );
+                }
+
+                // 5. Sorting
+                // Note: The base order is oldest first because new spots are pushed to the end of the JSON.
+                switch (currentSortOrder) {
+                    case 'name-asc':
+                        filteredSpots.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+                        break;
+                    case 'name-desc':
+                        filteredSpots.sort((a, b) => b.name.localeCompare(a.name, 'ja'));
+                        break;
+                    case 'default': // Newest first
+                        filteredSpots.reverse(); // Reverse the oldest-first array
+                        break;
+                    case 'default-desc': // Oldest first
+                    default:
+                        // Do nothing, the natural order is already oldest first.
+                        break;
+                }
+
+                // 6. Render
                 if (filteredSpots.length > 0) {
                     filteredSpots.forEach(spot => spotsList.appendChild(createCard(spot)));
                 } else {
@@ -1273,7 +1479,7 @@
                 }
                 updateListTitle();
             }
-            
+
             function updateListTitle() {
                 let titleText = '';
                 if (currentFilters.area !== 'all') titleText += `${currentFilters.area}の`;
@@ -1383,7 +1589,7 @@
             function getTransitTime(area1, area2, prefecture) {
                 if (area1 === area2) return 0;
                 const transitMatrix = allTransitData[prefecture];
-                if (!transitMatrix) return 25; // Default if no data
+                if (!transitMatrix) return null; // Prefecture data might not exist
 
                 if (transitMatrix[area1] && transitMatrix[area1][area2] !== undefined) {
                     return transitMatrix[area1][area2];
@@ -1391,26 +1597,29 @@
                 if (transitMatrix[area2] && transitMatrix[area2][area1] !== undefined) {
                     return transitMatrix[area2][area1];
                 }
-                return 25; // Default transit time
+                return null; // Return null if specific path is not defined
             }
 
             function parseStayTime(timeString) {
                 if (!timeString) return 0;
+                
+                if (timeString.includes('1日')) {
+                    return 8 * 60; // 8 hours for a full day
+                }
+
                 const numbers = timeString.match(/\d+/g)?.map(Number) || [];
                 if (numbers.length === 0) return 0;
                 
                 let totalMinutes = 0;
-                if (timeString.includes('-')) { // Handle ranges like "90-120分"
-                    totalMinutes = (numbers[0] + numbers[1]) / 2;
-                } else {
-                    totalMinutes = numbers[0];
-                }
-
                 if (timeString.includes('時間')) {
-                    totalMinutes *= 60;
-                    if (numbers.length > 1 && timeString.includes('分')) { // Handle "X時間Y分"
+                    totalMinutes = numbers[0] * 60;
+                    if (numbers.length > 1 && timeString.includes('分')) {
                         totalMinutes += numbers[1];
                     }
+                } else if (timeString.includes('-')) {
+                    totalMinutes = (numbers[0] + numbers[1]) / 2;
+                } else if (timeString.includes('分')) {
+                    totalMinutes = numbers[0];
                 }
                 return totalMinutes;
             }
@@ -1483,13 +1692,22 @@
 
                             if (nextSpot && spot.prefecture === nextSpot.prefecture) {
                                 const transitTime = getTransitTime(spot.area, nextSpot.area, spot.prefecture.replace(/[都府県]/, ''));
-                                totalMinutes += transitTime;
-                                transitEl.innerHTML = `
-                                    <div class="transit-time-icon">
-                                        <svg class="w-5 h-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v1.333a1 1 0 01-1.333 1.334h-1.334A2.667 2.667 0 006 8v5.333a2.667 2.667 0 002.667 2.667h1.334a1.333 1.333 0 110 2.666H8A5.333 5.333 0 012.667 13.333V8a5.333 5.333 0 015.333-5.333h.001zm4.667 1.333a1 1 0 10-1.334-1.333A2.667 2.667 0 0010.667 4v1.333a2.667 2.667 0 002.666 2.667h1.334a1.333 1.333 0 100-2.667h-1.334A1 1 0 0114.667 4.333z" clip-rule="evenodd" /></svg>
-                                    </div>
-                                    <span class="text-sm font-semibold text-gray-600">移動: 約${transitTime}分</span>
-                                `;
+                                if (transitTime !== null) {
+                                    totalMinutes += transitTime;
+                                    transitEl.innerHTML = `
+                                        <div class="transit-time-icon">
+                                            <svg class="w-5 h-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v1.333a1 1 0 01-1.333 1.334h-1.334A2.667 2.667 0 006 8v5.333a2.667 2.667 0 002.667 2.667h1.334a1.333 1.333 0 110 2.666H8A5.333 5.333 0 012.667 13.333V8a5.333 5.333 0 015.333-5.333h.001zm4.667 1.333a1 1 0 10-1.334-1.333A2.667 2.667 0 0010.667 4v1.333a2.667 2.667 0 002.666 2.667h1.334a1.333 1.333 0 100-2.667h-1.334A1 1 0 0114.667 4.333z" clip-rule="evenodd" /></svg>
+                                        </div>
+                                        <span class="text-sm font-semibold text-gray-600">移動: 約${transitTime}分</span>
+                                    `;
+                                } else {
+                                    transitEl.innerHTML = `
+                                        <div class="transit-time-icon">
+                                            <svg class="w-5 h-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                        </div>
+                                        <span class="text-xs font-semibold text-yellow-600">エリア間の移動時間は未設定です</span>
+                                    `;
+                                }
                             } else {
                                  transitEl.innerHTML = `
                                     <div class="transit-time-icon">
@@ -1526,12 +1744,14 @@
             let draggedItem = null;
             
             function handleDragStart(e) {
-                if (viewedUserId !== currentUser.uid || !e.target.classList.contains('move-handle')) {
+                if (!e.target.classList.contains('move-handle')) {
                     e.preventDefault();
                     return;
                 }
                 draggedItem = e.target.closest('.plan-item');
-                setTimeout(() => { if(draggedItem) draggedItem.classList.add('dragging'); }, 0);
+                setTimeout(() => {
+                    if(draggedItem) draggedItem.classList.add('dragging');
+                }, 0);
             }
 
             function handleDragOver(e) {
@@ -1554,7 +1774,7 @@
                 const newPlanOrder = [...planItemsList.querySelectorAll('.plan-item')].map(item => item.dataset.spotName);
                 
                 localPlan = newPlanOrder;
-                renderPlan();
+                renderPlan(); // Re-render to update transit times correctly
                 
                 savePlanOrder(newPlanOrder);
                 draggedItem = null;
@@ -1653,12 +1873,12 @@
                 const modalTagsContainer = document.getElementById('modal-tags');
                 modalTagsContainer.innerHTML = '';
                  if (spot.tags) {
-                       spot.tags.forEach(tag => {
-                           const tagEl = document.createElement('span');
-                           tagEl.className = 'text-sm bg-teal-100 text-teal-800 px-3 py-1 rounded-full';
-                           tagEl.textContent = `#${tag}`;
-                           modalTagsContainer.appendChild(tagEl);
-                       });
+                        spot.tags.forEach(tag => {
+                            const tagEl = document.createElement('span');
+                            tagEl.className = 'text-sm bg-teal-100 text-teal-800 px-3 py-1 rounded-full';
+                            tagEl.textContent = `#${tag}`;
+                            modalTagsContainer.appendChild(tagEl);
+                        });
                }
 
                 const modalWebsite = document.getElementById('modal-website');
@@ -1672,17 +1892,11 @@
                     modalWebsite.classList.add('hidden');
                 }
 
-                modal.classList.remove('hidden');
-                setTimeout(() => {
-                    modal.classList.remove('opacity-0');
-                    modalContent.classList.remove('opacity-0', '-translate-y-12');
-                }, 10);
+                showOverlay(modal);
             }
             
             function closeModal() {
-                modal.classList.add('opacity-0');
-                modalContent.classList.add('opacity-0', '-translate-y-12');
-                setTimeout(() => modal.classList.add('hidden'), 300);
+                hideOverlay(modal);
             }
 
             function showConfirmationModal(message, actionButtonText, buttonClass, onConfirm) {
@@ -1691,20 +1905,20 @@
 
                 confirmActionBtn.className = `py-2 px-6 text-white rounded-lg font-semibold transition-colors ${buttonClass} hover:${buttonClass.replace('500', '600')}`;
 
-                confirmationOverlay.classList.add('visible');
+                showOverlay(confirmationOverlay);
 
                 confirmActionBtn.onclick = () => {
                     onConfirm();
-                    confirmationOverlay.classList.remove('visible');
+                    hideOverlay(confirmationOverlay);
                 };
             }
 
             function showCrossPrefectureConfirmation(spotToAdd, firstSpotInPlan) {
                 crossPrefectureMessage.innerHTML = `「${firstSpotInPlan.prefecture}」のプランに「${spotToAdd.prefecture}」のスポットを追加しようとしています。<br>移動時間が正しく計算されませんが、よろしいですか？`;
-                crossPrefectureOverlay.classList.add('visible');
+                showOverlay(crossPrefectureOverlay);
 
                 const closeOverlay = () => {
-                    crossPrefectureOverlay.classList.remove('visible');
+                    hideOverlay(crossPrefectureOverlay);
                     crossPrefectureAddBtn.onclick = null;
                     crossPrefectureFavoriteBtn.onclick = null;
                     crossPrefectureCancelBtn.onclick = null;
@@ -1755,9 +1969,9 @@
             
             openAreaFilterBtn.addEventListener('click', () => {
                 renderAreaFilterContent();
-                areaFilterOverlay.classList.add('visible');
+                showOverlay(areaFilterOverlay);
             });
-            closeAreaFilterBtn.addEventListener('click', () => areaFilterOverlay.classList.remove('visible'));
+            closeAreaFilterBtn.addEventListener('click', () => hideOverlay(areaFilterOverlay));
             
             areaViewSwitcher.addEventListener('click', (e) => {
                 const button = e.target.closest('button');
@@ -1772,7 +1986,7 @@
                 if (button) {
                     currentFilters.area = button.dataset.area;
                     renderSpots();
-                    areaFilterOverlay.classList.remove('visible');
+                    hideOverlay(areaFilterOverlay);
                 }
             });
 
@@ -1781,22 +1995,22 @@
                 if (button) {
                     currentFilters.area = button.dataset.area;
                     renderSpots();
-                    areaFilterOverlay.classList.remove('visible');
+                    hideOverlay(areaFilterOverlay);
                 }
             });
             
             openTagFilterBtn.addEventListener('click', () => {
                 renderTags();
-                tagFilterOverlay.classList.add('visible');
+                showOverlay(tagFilterOverlay);
             });
-            closeTagFilterBtn.addEventListener('click', () => tagFilterOverlay.classList.remove('visible'));
+            closeTagFilterBtn.addEventListener('click', () => hideOverlay(tagFilterOverlay));
 
             tagFilters.addEventListener('click', (e) => {
                 const button = e.target.closest('.tag-btn');
                 if (button) {
                     currentFilters.tag = button.dataset.filter;
                     renderSpots();
-                    tagFilterOverlay.classList.remove('visible');
+                    hideOverlay(tagFilterOverlay);
                 }
             });
 
@@ -1804,14 +2018,14 @@
             modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
             
             myPlanBtn.addEventListener('click', () => {
-                document.body.classList.add('overflow-hidden');
                 myPlanPanelOverlay.classList.remove('hidden');
                 myPlanPanel.classList.remove('translate-x-full');
+                toggleBodyScroll(true);
             });
             const closePlanPanel = () => {
-                document.body.classList.remove('overflow-hidden');
                 myPlanPanel.classList.add('translate-x-full');
                 myPlanPanelOverlay.classList.add('hidden');
+                toggleBodyScroll(false);
             };
             myPlanCloseBtn.addEventListener('click', closePlanPanel);
             myPlanPanelOverlay.addEventListener('click', closePlanPanel);
@@ -1820,9 +2034,9 @@
                 showConfirmationModal('本当にすべてのプランを削除しますか？', '削除', 'bg-red-500', clearPlan);
             });
 
-            confirmCancelBtn.addEventListener('click', () => confirmationOverlay.classList.remove('visible'));
+            confirmCancelBtn.addEventListener('click', () => hideOverlay(confirmationOverlay));
             confirmationOverlay.addEventListener('click', (e) => {
-                if (e.target === confirmationOverlay) confirmationOverlay.classList.remove('visible');
+                if (e.target === confirmationOverlay) hideOverlay(confirmationOverlay);
             });
 
             copyPlanBtn.addEventListener('click', () => {
@@ -1845,8 +2059,12 @@
                         const nextSpot = combinedSpots.find(s => s.name === plan[index + 1]);
                         if (nextSpot && spot.prefecture === nextSpot.prefecture) {
                             const transitTime = getTransitTime(spot.area, nextSpot.area, spot.prefecture.replace(/[都府県]/, ''));
-                            totalMinutes += transitTime;
-                            planText += `   ⬇️\n   (移動: 約${transitTime}分)\n`;
+                            if (transitTime !== null) {
+                                totalMinutes += transitTime;
+                                planText += `   ⬇️\n   (移動: 約${transitTime}分)\n`;
+                            } else {
+                                planText += `   ⬇️\n   (移動: 時間未設定)\n`;
+                            }
                         } else {
                             planText += `   ⬇️\n   (他県への移動)\n`;
                         }
@@ -1951,9 +2169,9 @@
                     settingsEmail.textContent = currentUser.email || 'N/A';
                     settingsIconPreview.src = currentUser.photoURL || 'https://placehold.co/40x40/D35400/FFF?text=👤';
                 }
-                userSettingsOverlay.classList.add('visible');
+                showOverlay(userSettingsOverlay);
             });
-            closeUserSettingsBtn.addEventListener('click', () => userSettingsOverlay.classList.remove('visible'));
+            closeUserSettingsBtn.addEventListener('click', () => hideOverlay(userSettingsOverlay));
             
             saveSettingsBtn.addEventListener('click', async () => {
                 const newDisplayName = settingsUsernameInput.value.trim();
@@ -1966,7 +2184,7 @@
                     }
                     
                     showInfoModal("設定を保存しました。");
-                    userSettingsOverlay.classList.remove('visible');
+                    hideOverlay(userSettingsOverlay);
                     initAppForUser(currentUser); 
                 } catch (error) {
                     showInfoModal("設定の保存に失敗しました。");
@@ -1983,7 +2201,7 @@
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     cropperImage.src = event.target.result;
-                    cropperOverlay.classList.add('visible');
+                    showOverlay(cropperOverlay);
                     
                     if (cropper) {
                         cropper.destroy();
@@ -2001,7 +2219,7 @@
             });
 
             cropperCancelBtn.addEventListener('click', () => {
-                cropperOverlay.classList.remove('visible');
+                hideOverlay(cropperOverlay);
                 if(cropper) cropper.destroy();
             });
 
@@ -2033,7 +2251,7 @@
                     } finally {
                         iconUploadSpinner.classList.add('hidden');
                         cropperSaveBtn.disabled = false;
-                        cropperOverlay.classList.remove('visible');
+                        hideOverlay(cropperOverlay);
                         if(cropper) cropper.destroy();
                     }
                 }, 'image/png');
@@ -2051,10 +2269,10 @@
             });
 
             addSpotBtn.addEventListener('click', () => {
-                addSpotOverlay.classList.add('visible');
+                showOverlay(addSpotOverlay);
             });
             closeAddSpotBtn.addEventListener('click', () => {
-                addSpotOverlay.classList.remove('visible');
+                hideOverlay(addSpotOverlay);
             });
             submitSpotBtn.addEventListener('click', async () => {
                 const spotName = newSpotName.value.trim();
@@ -2105,7 +2323,7 @@
                     }
                     if (!aiData.prefecture || !supportedPrefectureNames.includes(aiData.prefecture)) {
                         pendingReAnalysisData = { ...aiData, originalName: spotName, originalUrl: spotUrl };
-                        reAnalysisOverlay.classList.add('visible');
+                        showOverlay(reAnalysisOverlay);
                         submitSpotSpinner.classList.add('hidden');
                         submitSpotBtn.disabled = false;
                         return; 
@@ -2123,7 +2341,7 @@
                     showInfoModal("スポットの提案を送信しました。管理者の承認をお待ちください。");
                     newSpotName.value = '';
                     newSpotUrl.value = '';
-                    addSpotOverlay.classList.remove('visible');
+                    hideOverlay(addSpotOverlay);
 
                 } catch (error) {
                     console.error("AI分析または提案の送信に失敗しました:", error);
@@ -2134,7 +2352,7 @@
                 }
             });
             
-            closeReAnalysisBtn.addEventListener('click', () => reAnalysisOverlay.classList.remove('visible'));
+            closeReAnalysisBtn.addEventListener('click', () => hideOverlay(reAnalysisOverlay));
             
             reSubmitSpotBtn.addEventListener('click', async () => {
                  const gmapsUrl = reAnalysisGmapsUrl.value.trim();
@@ -2171,8 +2389,8 @@
                      showInfoModal("スポットの提案を送信しました。管理者の承認をお待ちください。");
                      newSpotName.value = '';
                      newSpotUrl.value = '';
-                     addSpotOverlay.classList.remove('visible');
-                     reAnalysisOverlay.classList.remove('visible');
+                     hideOverlay(addSpotOverlay);
+                     hideOverlay(reAnalysisOverlay);
 
                  } catch(error) {
                       console.error("AI再分析または提案の送信に失敗しました:", error);
@@ -2210,7 +2428,7 @@
                     console.error("Firestore permission error on spot_submissions:", error);
                     if (error.code === 'permission-denied') {
                         showInfoModal("管理者権限エラー: 提案リストの読み込みに失敗しました。アクセス権限を確認してください。");
-                        submissionPanelOverlay.classList.remove('visible');
+                        hideOverlay(submissionPanelOverlay);
                         adminControls.classList.add('hidden');
                     }
                 });
@@ -2232,6 +2450,10 @@
                     updateAdminBadgeUI();
                 }, (error) => {
                     console.error("Firestore permission error on image_reports:", error);
+                    if (error.code === 'permission-denied') {
+                        showInfoModal("管理者権限エラー: 画像レポートの読み込みに失敗しました。");
+                        imageReportList.innerHTML = '<p class="text-center text-red-500 py-10">権限エラーにより画像レポートを読み込めませんでした。</p>';
+                    }
                 });
             }
 
@@ -2240,21 +2462,30 @@
                 card.id = `report-${id}`;
                 card.className = 'bg-gray-50 p-4 rounded-lg border space-y-3';
                 
-                const spot = combinedSpots.find(s => s.name === data.spotName);
+                const date = data.submittedAt ? data.submittedAt.toDate().toLocaleString('ja-JP') : '日付不明';
 
                 card.innerHTML = `
                     <div>
                         <h3 class="font-bold text-lg">${data.spotName}</h3>
                         <p class="text-sm text-gray-500">報告者: ${data.submittedBy.substring(0,8)}...</p>
-                        <p class="text-sm text-gray-500">報告日時: ${data.submittedAt.toDate().toLocaleString('ja-JP')}</p>
+                        <p class="text-sm text-gray-500">報告日時: ${date}</p>
                     </div>
                     <div class="flex items-center gap-4">
                         <p class="font-semibold text-sm">現在の画像:</p>
-                        <img src="${spot?.image || 'https://placehold.co/100x75/ccc/FFF?text=N/A'}" class="w-24 h-auto rounded" onerror="this.onerror=null;this.src='https://placehold.co/100x75/ccc/FFF?text=Error';">
+                        <img src="${data.currentImageUrl || 'https://placehold.co/100x75/ccc/FFF?text=N/A'}" class="w-24 h-auto rounded" onerror="this.onerror=null;this.src='https://placehold.co/100x75/ccc/FFF?text=Error';">
                     </div>
-                    <div class="mt-4 flex gap-2">
-                        <button data-id="${id}" data-spot-name="${data.spotName}" class="update-image-btn flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-600">AIで画像を更新</button>
-                        <button data-id="${id}" class="reject-report-btn flex-1 bg-red-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-600">レポートを却下</button>
+                    <div class="mt-4 space-y-2">
+                        <div class="flex gap-2">
+                            <button data-id="${id}" data-spot-name="${data.spotName}" data-prefecture="${data.prefecture}" data-current-image-url="${data.currentImageUrl}" class="update-image-ai-btn flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-600">AIで候補を検索</button>
+                            <button data-id="${id}" class="reject-report-btn flex-1 bg-red-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-600">却下</button>
+                        </div>
+                        <div class="border-t pt-2">
+                            <p class="text-sm font-semibold text-gray-600 mb-1">または、手動でURLを更新:</p>
+                            <div class="flex gap-2">
+                                <input type="url" placeholder="新しい画像URL" class="manual-image-url-input flex-grow border-gray-300 rounded-md shadow-sm text-sm">
+                                <button data-id="${id}" data-spot-name="${data.spotName}" data-prefecture="${data.prefecture}" class="manual-update-btn bg-gray-600 text-white py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 text-xs">保存</button>
+                            </div>
+                        </div>
                     </div>
                 `;
                 imageReportList.appendChild(card);
@@ -2340,37 +2571,9 @@
             }
             
             openSubmissionPanelBtn.addEventListener('click', () => {
-                submissionPanelOverlay.classList.add('visible');
+                showOverlay(submissionPanelOverlay);
             });
-            closeSubmissionPanelBtn.addEventListener('click', () => submissionPanelOverlay.classList.remove('visible'));
-
-            function updateStateWithNewData(spotData, newAreaData = null) {
-                combinedSpots.push(spotData);
-
-                const prefId = spotData.prefecture.replace(/[都府県]/, '');
-                if (allSpotsData[prefId]) {
-                    allSpotsData[prefId].push(spotData);
-                } else {
-                    allSpotsData[prefId] = [spotData];
-                }
-
-                if (newAreaData) {
-                    if (!areaPositions[prefId]) areaPositions[prefId] = [];
-                    areaPositions[prefId].push({ name: newAreaData.area, top: newAreaData.top, left: newAreaData.left });
-
-                    if (!allTransitData[prefId]) allTransitData[prefId] = {};
-                    
-                    if (Object.keys(newAreaData.transitData).length > 0) {
-                        allTransitData[prefId][newAreaData.area] = newAreaData.transitData;
-                        for (const [existingArea, time] of Object.entries(newAreaData.transitData)) {
-                            if (!allTransitData[prefId][existingArea]) {
-                                allTransitData[prefId][existingArea] = {};
-                            }
-                            allTransitData[prefId][existingArea][newAreaData.area] = time;
-                        }
-                    }
-                }
-            }
+            closeSubmissionPanelBtn.addEventListener('click', () => hideOverlay(submissionPanelOverlay));
 
             submissionList.addEventListener('click', async (e) => {
                 const target = e.target.closest('button');
@@ -2447,106 +2650,22 @@
                 } else if (target.classList.contains('approve-btn')) {
                     target.disabled = true;
                     target.textContent = '承認中...';
-                    const submissionRef = doc(db, "spot_submissions", submissionId);
-                    const submissionSnap = await getDoc(submissionRef);
-                    if (submissionSnap.exists()) {
-                        const data = submissionSnap.data();
-                        const approveNewArea = card.querySelector('[name="approveNewArea"]')?.checked || false;
-
-                        const message = `スポット「${data.name}」を承認します。${(data.isNewArea && approveNewArea) ? `\n新しいエリア「${data.area}」も同時に承認されます。` : ''}\n対応するJSONファイルを選択して保存してください。`;
-                        
-                        showConfirmationModal(message, '承認して保存', 'bg-green-500', async () => {
-                            try {
-                                const prefId = data.prefecture.replace(/[都府県]/, '');
-                                const prefName = supportedPrefectureNames.find(name => name.startsWith(prefId)) || data.prefecture;
-                                
-                                let finalSpotData = { ...data };
-                                let newAreaDataToCreate = null;
-
-                                if (data.isNewArea && !approveNewArea) {
-                                    finalSpotData.area = "その他";
-                                    const existingOtherArea = originalJsonData[prefId]?.areaPositions.find(p => p.name === "その他");
-                                    if (!existingOtherArea) {
-                                        newAreaDataToCreate = {
-                                            area: "その他",
-                                            top: "95%", left: "95%",
-                                            transitData: {}
-                                        };
-                                    }
-                                } else if (data.isNewArea && approveNewArea) {
-                                    newAreaDataToCreate = {
-                                        area: data.area,
-                                        top: data.newAreaPosition.top,
-                                        left: data.newAreaPosition.left,
-                                        transitData: data.newTransitData
-                                    };
-                                }
-
-                                const imageData = await fetchImageForSpot(finalSpotData, prefName);
-                                
-                                const newSpotData = {
-                                    prefecture: finalSpotData.prefecture, name: finalSpotData.name, area: finalSpotData.area,
-                                    category: finalSpotData.category, subCategory: finalSpotData.subCategory,
-                                    description: finalSpotData.description, website: finalSpotData.website, gmaps: finalSpotData.gmaps,
-                                    stayTime: finalSpotData.stayTime, tags: finalSpotData.tags,
-                                    image: imageData ? imageData.url : `https://placehold.co/600x400/E57373/FFF?text=${encodeURIComponent(finalSpotData.name)}`,
-                                    imageSource: imageData ? imageData.displayLink : "ユーザー提案", 
-                                    imageSourceUrl: imageData ? imageData.sourceLink : finalSpotData.website,
-                                };
-                                
-                                const [fileHandle] = await window.showOpenFilePicker({
-                                    types: [{ description: 'JSON Files', accept: {'application/json': ['.json']} }],
-                                    suggestedName: `${prefId}.json`
-                                });
-                                
-                                const file = await fileHandle.getFile();
-                                const currentFileContent = await file.text();
-                                let currentJson = JSON.parse(currentFileContent || '{}');
-                                
-                                if (!currentJson.spots) currentJson.spots = [];
-                                currentJson.spots.push(newSpotData);
-
-                                if (newAreaDataToCreate) {
-                                    if (!currentJson.areaPositions) currentJson.areaPositions = [];
-                                    currentJson.areaPositions.push({ name: newAreaDataToCreate.area, top: newAreaDataToCreate.top, left: newAreaDataToCreate.left });
-                                    
-                                    if (Object.keys(newAreaDataToCreate.transitData).length > 0) {
-                                        if (!currentJson.transitData) currentJson.transitData = {};
-                                        currentJson.transitData[newAreaDataToCreate.area] = newAreaDataToCreate.transitData;
-                                        for (const [existingArea, time] of Object.entries(newAreaDataToCreate.transitData)) {
-                                            if (!currentJson.transitData[existingArea]) {
-                                                currentJson.transitData[existingArea] = {};
-                                            }
-                                            currentJson.transitData[existingArea][newAreaDataToCreate.area] = time;
-                                        }
-                                    }
-                                }
-                                
-                                const writable = await fileHandle.createWritable();
-                                await writable.write(JSON.stringify(currentJson, null, 2));
-                                await writable.close();
-                                
-                                updateStateWithNewData(newSpotData, newAreaDataToCreate);
-                                
-                                await addDoc(collection(db, "announcements"), {
-                                    title: "新しいスポットが追加されました！",
-                                    message: `「${newSpotData.name}」（${newSpotData.prefecture}）が新しく追加されました。`,
-                                    createdAt: serverTimestamp(),
-                                });
-
-                                await deleteDoc(submissionRef);
-                                
-                                renderAll();
-                                
-                                showInfoModal("承認処理が完了し、サイトに即時反映されました。");
-                                
-                            } catch(err) {
-                                console.error("ファイルの保存または状態の更新に失敗しました:", err);
-                                showInfoModal("ファイルの保存がキャンセルされたか、失敗しました。");
-                                target.disabled = false;
-                                target.textContent = '承認';
-                            }
-                        });
+                    try {
+                        const submissionRef = doc(db, "spot_submissions", submissionId);
+                        const submissionSnap = await getDoc(submissionRef);
+                        if (submissionSnap.exists()) {
+                            const approveSubmission = httpsCallable(functions, 'approveSubmission');
+                            await approveSubmission({
+                                submissionId: submissionId,
+                                submissionData: submissionSnap.data(),
+                                approveNewArea: card.querySelector('[name="approveNewArea"]')?.checked || false
+                            });
+                            await reloadDataAndRefreshUI("データの更新をリクエストしました。\n反映には数分かかる場合があります。");
+                        }
+                    } catch (error) {
+                        console.error("承認処理に失敗:", error);
+                        showInfoModal(`承認処理に失敗しました: ${error.message}`);
+                    } finally {
                         target.disabled = false;
                         target.textContent = '承認';
                     }
@@ -2560,15 +2679,15 @@
             });
 
             mailboxBtn.addEventListener('click', () => {
-                document.body.classList.add('overflow-hidden');
-                mailboxPanelOverlay.classList.remove('hidden');
+                myPlanPanelOverlay.classList.remove('hidden');
                 mailboxPanel.classList.remove('translate-x-full');
+                toggleBodyScroll(true);
             });
 
             const closeMailboxPanel = async () => {
-                document.body.classList.remove('overflow-hidden');
                 mailboxPanel.classList.add('translate-x-full');
-                mailboxPanelOverlay.classList.add('hidden');
+                myPlanPanelOverlay.classList.add('hidden');
+                toggleBodyScroll(false);
 
                 // Mark personal notifications as read in Firestore
                 if (currentUser && !currentUser.isAnonymous) {
@@ -2608,7 +2727,7 @@
                     const item = document.createElement('div');
                     item.className = `p-4 border-b ${!isRead ? 'bg-orange-50 font-bold' : 'bg-white'}`;
                     
-                    const date = docData.submittedAt?.toDate().toLocaleString('ja-JP') || '日付不明';
+                    const date = docData.createdAt ? docData.createdAt.toDate().toLocaleString('ja-JP') : '日付不明';
 
                     item.innerHTML = `
                         <h4 class="text-md ${!isRead ? 'text-orange-800' : 'text-gray-800'}">${docData.title}</h4>
@@ -2642,118 +2761,48 @@
                 localStorage.setItem('lastReadAnnouncementTimestamp', latestTimestamp);
             });
 
-            async function fetchImageForSpot(spot, prefectureName) {
-                try {
-                    const fetchImageForSpotCallable = httpsCallable(functions, 'fetchImageForSpot');
-                    const result = await fetchImageForSpotCallable({
-                        spot: spot,
-                        prefectureName: prefectureName
-                    });
-                    return result.data;
-                } catch (error) {
-                    console.error(`「${spot.name}」の画像取得エラー:`, error);
-                    return null;
-                }
-            }
-
             batchUpdateImagesBtn.addEventListener('click', () => {
-                prefectureSelectTitle.textContent = "画像一括更新";
-                prefectureSelectMessage.textContent = "どの都道府県のスポット画像を更新しますか？";
-                prefectureSelectButtons.innerHTML = '';
-
-                Object.keys(originalJsonData).forEach(prefId => {
-                    const prefName = originalJsonData[prefId].name;
-                    const button = document.createElement('button');
-                    button.textContent = prefName;
-                    button.className = 'w-full py-2 px-6 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600';
-                    button.onclick = () => {
-                        prefectureSelectOverlay.classList.remove('visible');
-                        batchUpdateImages(prefId, prefName);
-                    };
-                    prefectureSelectButtons.appendChild(button);
-                });
-                prefectureSelectOverlay.classList.add('visible');
+                showInfoModal("この機能は現在、GitHub連携システムへの移行に伴い、無効化されています。");
             });
-            prefectureSelectCancelBtn.addEventListener('click', () => prefectureSelectOverlay.classList.remove('visible'));
+            
+            // --- New/Updated Image Report Logic ---
+            reportImageBtn.addEventListener('click', async () => {
+                const spotName = modal.dataset.spotName;
+                const spot = combinedSpots.find(s => s.name === spotName);
+                if (!spot || !currentUser) return;
 
-            async function batchUpdateImages(prefId, prefName) {
-                const spotsToUpdate = allSpotsData[prefId];
-                if (!spotsToUpdate || spotsToUpdate.length === 0) {
-                    showInfoModal(`${prefName}には更新対象のスポットがありません。`);
+                const reportsRef = collection(db, "image_reports");
+                const q = query(reportsRef, where("spotName", "==", spotName), where("status", "==", "pending"));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    showInfoModal("このスポットの画像は既に報告されています。");
                     return;
                 }
 
-                progressOverlay.classList.add('visible');
-                let updatedCount = 0;
-                let failedCount = 0;
-
-                for (let i = 0; i < spotsToUpdate.length; i++) {
-                    const spot = spotsToUpdate[i];
-                    progressMessage.textContent = `処理中: ${i + 1} / ${spotsToUpdate.length} - ${spot.name}`;
-                    progressBar.style.width = `${((i + 1) / spotsToUpdate.length) * 100}%`;
-
-                    const imageData = await fetchImageForSpot(spot, prefName);
-                    if (imageData) {
-                        spot.image = imageData.url;
-                        spot.imageSource = imageData.displayLink;
-                        spot.imageSourceUrl = imageData.sourceLink;
-                        updatedCount++;
-                    } else {
-                        failedCount++;
+                showConfirmationModal(
+                    `「${spotName}」の画像がスポットと無関係、または不適切であると報告しますか？`,
+                    "報告する",
+                    "bg-red-500",
+                    async () => {
+                        try {
+                            await addDoc(collection(db, "image_reports"), {
+                                spotName: spot.name,
+                                prefecture: spot.prefecture,
+                                currentImageUrl: spot.image,
+                                submittedBy: currentUser.uid,
+                                submittedAt: serverTimestamp(),
+                                status: "pending"
+                            });
+                            showInfoModal("ご報告ありがとうございます。管理者が確認します。");
+                            closeModal();
+                        } catch (error) {
+                            console.error("Error submitting image report:", error);
+                            showInfoModal("報告の送信に失敗しました。");
+                        }
                     }
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                }
-                
-                progressOverlay.classList.remove('visible');
-
-                const summaryMessage = `${prefName}の全${spotsToUpdate.length}件のスポットのうち、${updatedCount}件の画像を更新し、${failedCount}件が失敗しました。更新内容をJSONファイルに保存しますか？`;
-                showConfirmationModal(summaryMessage, 'JSONを保存', 'bg-blue-500', async () => {
-                    try {
-                        const fileData = originalJsonData[prefId];
-                        fileData.spots = spotsToUpdate; 
-
-                        const [fileHandle] = await window.showOpenFilePicker({
-                            types: [{ description: 'JSON Files', accept: {'application/json': ['.json']} }],
-                            suggestedName: `${prefId}.json`
-                        });
-                        const writable = await fileHandle.createWritable();
-                        await writable.write(JSON.stringify(fileData, null, 2));
-                        await writable.close();
-                        showInfoModal("ファイルの保存が完了しました。ページをリロードして変更を反映してください。");
-                    } catch (err) {
-                        console.error("ファイル保存エラー:", err);
-                        showInfoModal("ファイルの保存がキャンセルされたか、失敗しました。");
-                    }
-                });
-            }
-
-            // NEW: Event listener for the report image button in the modal
-            reportImageBtn.addEventListener('click', () => {
-                const spotName = modal.dataset.spotName;
-                if (!spotName) return;
-
-                showConfirmationModal(`「${spotName}」の画像が正しくない、または不適切であるとして報告しますか？`, '報告する', 'bg-red-500', async () => {
-                    if (!currentUser) {
-                        showInfoModal("報告するにはログインが必要です。");
-                        return;
-                    }
-                    try {
-                        await addDoc(collection(db, "image_reports"), {
-                            spotName: spotName,
-                            submittedBy: currentUser.uid,
-                            submittedAt: serverTimestamp(),
-                            status: "pending"
-                        });
-                        showInfoModal("画像を報告しました。管理者が確認します。");
-                        closeModal();
-                    } catch (error) {
-                        console.error("Error reporting image:", error);
-                        showInfoModal("報告に失敗しました。");
-                    }
-                });
+                );
             });
-            
-            // NEW: Delegated event listener for image report cards
+
             imageReportList.addEventListener('click', async (e) => {
                 const target = e.target.closest('button');
                 if (!target) return;
@@ -2761,82 +2810,124 @@
                 const reportId = target.dataset.id;
                 if (!reportId) return;
                 
-                const reportRef = doc(db, "image_reports", reportId);
+                const card = document.getElementById(`report-${reportId}`);
+                const spotName = target.dataset.spotName;
+                const prefecture = target.dataset.prefecture;
 
                 if (target.classList.contains('reject-report-btn')) {
                     showConfirmationModal(`この画像レポートを却下しますか？`, '却下する', 'bg-red-500', async () => {
-                        await deleteDoc(reportRef);
+                        await deleteDoc(doc(db, "image_reports", reportId));
                         showInfoModal("レポートを却下しました。");
                     });
-                } else if (target.classList.contains('update-image-btn')) {
-                    const spotName = target.dataset.spotName;
-                    const spot = combinedSpots.find(s => s.name === spotName);
-                    if (!spot) {
-                        showInfoModal("対象のスポットが見つかりませんでした。");
-                        return;
+
+                } else if (target.classList.contains('update-image-ai-btn')) {
+                    activeImageReportData = { reportId, spotName, prefecture };
+                    
+                    showOverlay(imageCandidateOverlay);
+                    imageCandidateList.innerHTML = '';
+                    imageCandidateList.classList.add('hidden');
+                    imageCandidateLoading.classList.remove('hidden');
+                    imageCandidateConfirmBtn.disabled = true;
+
+                    try {
+                        const fetchImageForSpotCallable = httpsCallable(functions, 'fetchImageForSpot');
+                        const result = await fetchImageForSpotCallable({
+                            spot: { name: spotName, area: combinedSpots.find(s => s.name === spotName)?.area || '' },
+                            prefectureName: prefecture,
+                            reportedImageUrl: target.dataset.currentImageUrl
+                        });
+                        displayImageCandidates(result.data.candidates);
+                    } catch (error) {
+                        console.error("Error fetching image candidates:", error);
+                        showInfoModal(`画像候補の取得に失敗しました: ${error.message}`);
+                        hideOverlay(imageCandidateOverlay);
+                    } finally {
+                        imageCandidateLoading.classList.add('hidden');
+                        imageCandidateList.classList.remove('hidden');
                     }
 
-                    showConfirmationModal(`「${spotName}」の画像をAIで再取得し、JSONファイルを更新しますか？`, '更新して保存', 'bg-blue-500', async () => {
-                        progressOverlay.classList.add('visible');
-                        progressMessage.textContent = `処理中: ${spot.name}の画像を取得しています...`;
-                        progressBar.style.width = `50%`;
-
-                        const prefName = spot.prefecture;
-                        const imageData = await fetchImageForSpot(spot, prefName);
-
-                        if (!imageData) {
-                            progressOverlay.classList.remove('visible');
-                            showInfoModal("新しい画像の取得に失敗しました。");
-                            return;
-                        }
-                        
-                        const prefId = prefName.replace(/[都府県]/, '');
-                        const fileData = JSON.parse(JSON.stringify(originalJsonData[prefId])); // Deep copy
-                        const spotIndex = fileData.spots.findIndex(s => s.name === spotName);
-                        
-                        if (spotIndex === -1) {
-                            progressOverlay.classList.remove('visible');
-                            showInfoModal("JSONデータ内でスポットが見つかりませんでした。");
-                            return;
-                        }
-
-                        fileData.spots[spotIndex].image = imageData.url;
-                        fileData.spots[spotIndex].imageSource = imageData.displayLink;
-                        fileData.spots[spotIndex].imageSourceUrl = imageData.sourceLink;
-
-                        try {
-                            const [fileHandle] = await window.showOpenFilePicker({
-                                types: [{ description: 'JSON Files', accept: {'application/json': ['.json']} }],
-                                suggestedName: `${prefId}.json`
-                            });
-                            const writable = await fileHandle.createWritable();
-                            await writable.write(JSON.stringify(fileData, null, 2));
-                            await writable.close();
-                            
-                            await deleteDoc(reportRef);
-                            
-                            // Update local data for immediate reflection
-                            originalJsonData[prefId] = fileData;
-                            const combinedSpotIndex = combinedSpots.findIndex(s => s.name === spotName);
-                            if (combinedSpotIndex !== -1) {
-                                combinedSpots[combinedSpotIndex] = fileData.spots[spotIndex];
-                            }
-                            allSpotsData[prefId] = fileData.spots;
-                            
-                            renderAll();
-                            progressOverlay.classList.remove('visible');
-                            showInfoModal("画像の更新とファイルの保存が完了しました。");
-
-                        } catch (err) {
-                            progressOverlay.classList.remove('visible');
-                            console.error("ファイル保存エラー:", err);
-                            showInfoModal("ファイルの保存がキャンセルされたか、失敗しました。");
-                        }
-                    });
+                } else if (target.classList.contains('manual-update-btn')) {
+                    const urlInput = card.querySelector('.manual-image-url-input');
+                    const newImageUrl = urlInput.value.trim();
+                    if (!newImageUrl) {
+                        showInfoModal("新しい画像URLを入力してください。");
+                        return;
+                    }
+                    target.disabled = true;
+                    target.textContent = '保存中...';
+                     try {
+                        const resolveImageReport = httpsCallable(functions, 'resolveImageReport');
+                        await resolveImageReport({ reportId, spotName, newImageUrl, prefecture });
+                        await reloadDataAndRefreshUI("データの更新をリクエストしました。\n反映には数分かかる場合があります。");
+                    } catch (error) {
+                         showInfoModal(`手動での画像更新に失敗しました: ${error.message}`);
+                         console.error("Error resolving image report manually:", error);
+                    } finally {
+                        target.disabled = false;
+                        target.textContent = '保存';
+                    }
                 }
             });
+            
+            function displayImageCandidates(candidates) {
+                imageCandidateList.innerHTML = '';
+                if (!candidates || candidates.length === 0) {
+                    imageCandidateList.innerHTML = `<p class="col-span-full text-center text-gray-500 py-10">適切な画像候補が見つかりませんでした。</p>`;
+                    return;
+                }
 
-            // NEW: Tab switching logic for submission panel
+                candidates.forEach(candidate => {
+                    const div = document.createElement('div');
+                    div.className = 'candidate-image-wrapper p-2 border-2 border-transparent rounded-lg cursor-pointer hover:border-blue-300 transition-all';
+                    div.dataset.url = candidate.url;
+                    div.innerHTML = `<img src="${candidate.url}" class="w-full h-32 object-cover rounded-md pointer-events-none" onerror="this.parentElement.innerHTML = '<div class=\\'w-full h-32 bg-gray-200 flex items-center justify-center text-xs text-red-500 rounded-md\\'>画像読込失敗</div>'">`;
+                    imageCandidateList.appendChild(div);
+                });
+            }
+
+            imageCandidateList.addEventListener('click', (e) => {
+                const wrapper = e.target.closest('.candidate-image-wrapper');
+                if (!wrapper) return;
+
+                imageCandidateList.querySelectorAll('.candidate-image-wrapper').forEach(el => {
+                    el.classList.remove('selected');
+                });
+
+                wrapper.classList.add('selected');
+                imageCandidateConfirmBtn.disabled = false;
+            });
+
+            imageCandidateConfirmBtn.addEventListener('click', async () => {
+                const selectedWrapper = imageCandidateList.querySelector('.selected');
+                if (!selectedWrapper) {
+                    showInfoModal("画像を選択してください。");
+                    return;
+                }
+
+                const newImageUrl = selectedWrapper.dataset.url;
+                const { reportId, spotName, prefecture } = activeImageReportData;
+
+                imageCandidateConfirmBtn.disabled = true;
+                imageCandidateConfirmBtn.textContent = '更新中...';
+
+                try {
+                    const resolveImageReport = httpsCallable(functions, 'resolveImageReport');
+                    await resolveImageReport({ reportId, spotName, newImageUrl, prefecture });
+                    await reloadDataAndRefreshUI("データの更新をリクエストしました。\n反映には数分かかる場合があります。");
+                } catch (error) {
+                    console.error("Error resolving image report with AI candidate:", error);
+                    showInfoModal(`画像の更新に失敗しました: ${error.message}`);
+                } finally {
+                    imageCandidateConfirmBtn.disabled = false;
+                    imageCandidateConfirmBtn.textContent = 'この画像に決定';
+                }
+            });
+            
+            imageCandidateCancelBtn.addEventListener('click', () => {
+                hideOverlay(imageCandidateOverlay);
+            });
+
+
             submissionTabs.addEventListener('click', (e) => {
                 const button = e.target.closest('button');
                 if (!button) return;
@@ -2853,6 +2944,46 @@
                     imageReportContent.classList.remove('hidden');
                 }
             });
+
+            searchInput.addEventListener('input', (e) => {
+                currentSearchTerm = e.target.value.trim().toLowerCase();
+                renderSpots();
+            });
+
+            sortOrder.addEventListener('change', (e) => {
+                currentSortOrder = e.target.value;
+                renderSpots();
+            });
+
+            // --- Image Viewer Logic ---
+            function showImageViewer(imageUrl) {
+                imageViewerImg.src = imageUrl;
+                showOverlay(imageViewerOverlay);
+            }
+
+            userDisplay.addEventListener('click', (e) => {
+                if(e.target.classList.contains('profile-icon')) {
+                    showImageViewer(e.target.src);
+                }
+            });
+
+            modalContent.addEventListener('click', (e) => {
+                if(e.target.id === 'modal-image') {
+                    showImageViewer(e.target.src);
+                }
+            });
+
+            imageViewerOverlay.addEventListener('click', () => {
+                hideOverlay(imageViewerOverlay);
+            });
+            
+            mobileFilterToggle.addEventListener('click', () => {
+                const isOpen = !navContentWrapper.classList.contains('hidden');
+                navContentWrapper.classList.toggle('hidden');
+                mobileFilterToggle.classList.toggle('open', !isOpen);
+                mobileFilterToggleText.textContent = isOpen ? 'フィルターと検索を開く' : 'フィルターと検索を閉じる';
+            });
+
 
             function renderAll() {
                 renderSpots();
