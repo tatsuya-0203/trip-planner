@@ -779,7 +779,7 @@
           apiKey: "AIzaSyDe8piUl7dbuR_FAn1pQkUfVtugh5HF4FU", // このキーは公開しても安全です
           authDomain: "studio-gqqbe.firebaseapp.com",
           projectId: "studio-gqqbe",
-          storageBucket: "studio-gqqbe.appspot.com",
+          storageBucket: "studio-gqqbe.firebasestorage.app", // ← このように修正
           messagingSenderId: "369252587708",
           appId: "1:369252587708:web:86f2413bd89967e2a858b9"
         };
@@ -2472,7 +2472,7 @@
                     </div>
                     <div class="flex items-center gap-4">
                         <p class="font-semibold text-sm">現在の画像:</p>
-                        <img src="${data.currentImageUrl || 'https://placehold.co/100x75/ccc/FFF?text=N/A'}" class="w-24 h-auto rounded" onerror="this.onerror=null;this.src='https://placehold.co/100x75/ccc/FFF?text=Error';">
+                        <img src="${data.currentImageUrl || 'https://placehold.co/100x75/ccc/FFF?text=N/A'}" class="w-24 h-auto rounded" onerror="this.parentElement.innerHTML = '<div class=\\'w-full h-32 bg-gray-200 flex items-center justify-center text-xs text-red-500 rounded-md\\'>画像読込失敗</div>'">
                     </div>
                     <div class="mt-4 space-y-2">
                         <div class="flex gap-2">

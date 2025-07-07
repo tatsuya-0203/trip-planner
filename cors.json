@@ -1,17 +1,8 @@
 [
   {
     "origin": ["https://studio-gqqbe.web.app"],
-    "method": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
-    "responseHeader": [
-      "Content-Type",
-      "Access-Control-Allow-Origin",
-      "Authorization",
-      "X-Goog-Resumable",
-      "X-Goog-Upload-Command",
-      "X-Goog-Upload-Offset",
-      "X-Goog-Upload-Protocol",
-      "X-Goog-Upload-Status"
-    ],
+    "method": ["GET", "PUT", "POST", "DELETE"], 
+    "responseHeader": ["Content-Type"],
     "maxAgeSeconds": 3600
   }
 ]
