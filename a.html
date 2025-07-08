@@ -1080,7 +1080,7 @@
             // 1. Fetch the list of available prefectures from the Cloud Function
             let availablePrefectures = [];
             try {
-                const getPrefectureList = httpsCallable(functions, 'getPrefectureListV2');
+                const getPrefectureList = httpsCallable(functions, 'getPrefectureList');
                 const result = await getPrefectureList();
                 availablePrefectures = result.data;
             } catch (error) {
@@ -1800,7 +1800,7 @@
                         "bg-red-500",
                         async () => {
                             try {
-                                const directAdminSpotUpdate = httpsCallable(functions, 'directAdminSpotUpdateV2');
+                                const directAdminSpotUpdate = httpsCallable(functions, 'directAdminSpotUpdate');
                                 const result = await directAdminSpotUpdate({
                                     prefecture: spot.prefecture,
                                     spotName: spot.name,
@@ -2692,7 +2692,7 @@
                 submitSpotBtn.disabled = true;
                 
                 try {
-                    const analyzeSpotSuggestion = httpsCallable(functions, 'analyzeSpotSuggestionV2');
+                    const analyzeSpotSuggestion = httpsCallable(functions, 'analyzeSpotSuggestion');
                     const result = await analyzeSpotSuggestion({
                         spotName: spotName,
                         spotUrl: spotUrl,
@@ -2971,7 +2971,7 @@
                         const submissionSnap = await getDoc(submissionRef);
                         if(submissionSnap.exists()) {
                             const data = submissionSnap.data();
-                            const regenerateDescription = httpsCallable(functions, 'regenerateDescriptionV2');
+                            const regenerateDescription = httpsCallable(functions, 'regenerateDescription');
                             const result = await regenerateDescription({
                                 originalName: data.originalName,
                                 originalUrl: data.originalUrl
@@ -2999,7 +2999,7 @@
                         const submissionRef = doc(db, "spot_submissions", submissionId);
                         const submissionSnap = await getDoc(submissionRef);
                         if (submissionSnap.exists()) {
-                            const approveSubmission = httpsCallable(functions, 'approveSubmissionV2');
+                            const approveSubmission = httpsCallable(functions, 'approveSubmission');
                             await approveSubmission({
                                 submissionId: submissionId,
                                 submissionData: submissionSnap.data(),
@@ -3119,7 +3119,7 @@
                 batchUpdateSelectAll.checked = false;
 
                 try {
-                    const batchFindImageUpdatesCallable = httpsCallable(functions, 'batchFindImageUpdatesV2');
+                    const batchFindImageUpdatesCallable = httpsCallable(functions, 'batchFindImageUpdates');
                     const result = await batchFindImageUpdatesCallable({ prefectureId: prefectureId });
                     proposedImageUpdates = result.data;
                     
@@ -3241,7 +3241,7 @@
             batchUpdateImagesBtn.addEventListener('click', async () => {
                 showOverlay(batchUpdatePrefectureSelectOverlay);
                 try {
-                    const getBatchUpdateCounts = httpsCallable(functions, 'getBatchUpdateCountsV2');
+                    const getBatchUpdateCounts = httpsCallable(functions, 'getBatchUpdateCounts');
                     const result = await getBatchUpdateCounts();
                     renderBatchUpdateSelectView(result.data || {});
                 } catch (error) {
@@ -3316,7 +3316,7 @@
                         hideOverlay(batchImageUpdateOverlay);
                         showInfoModal("画像の更新処理を開始しました。完了まで数分かかる場合があります...");
                         try {
-                            const confirmImageUpdatesCallable = httpsCallable(functions, 'confirmImageUpdatesV2');
+                            const confirmImageUpdatesCallable = httpsCallable(functions, 'confirmImageUpdates');
                             const result = await confirmImageUpdatesCallable({ updates: updatesToConfirm });
                             await reloadDataAndRefreshUI(result.data.message || "画像の更新が完了しました。");
                         } catch (error) {
@@ -3489,7 +3489,7 @@
                     imageCandidateConfirmBtn.disabled = true;
 
                     try {
-                        const fetchImageForSpotCallable = httpsCallable(functions, 'fetchImageForSpotV2');
+                        const fetchImageForSpotCallable = httpsCallable(functions, 'fetchImageForSpot');
                         const result = await fetchImageForSpotCallable({
                             spot: { name: spotName, area: combinedSpots.find(s => s.name === spotName)?.area || '' },
                             prefectureName: prefecture,
@@ -3515,7 +3515,7 @@
                     target.disabled = true;
                     target.textContent = '保存中...';
                      try {
-                        const resolveImageReport = httpsCallable(functions, 'resolveImageReportV2');
+                        const resolveImageReport = httpsCallable(functions, 'resolveImageReport');
                         await resolveImageReport({ reportId, spotName, newImageUrl, prefecture });
                         await reloadDataAndRefreshUI("データの更新をリクエストしました。\n反映には数分かかる場合があります。");
                     } catch (error) {
@@ -3570,7 +3570,7 @@
                 imageCandidateConfirmBtn.textContent = '更新中...';
 
                 try {
-                    const resolveImageReport = httpsCallable(functions, 'resolveImageReportV2');
+                    const resolveImageReport = httpsCallable(functions, 'resolveImageReport');
                     await resolveImageReport({ reportId, spotName, newImageUrl, prefecture });
                     await reloadDataAndRefreshUI("データの更新をリクエストしました。\n反映には数分かかる場合があります。");
                 } catch (error) {
@@ -3767,7 +3767,7 @@
                 }
 
                 try {
-                    const submitEditRequest = httpsCallable(functions, 'submitEditRequestV2');
+                    const submitEditRequest = httpsCallable(functions, 'submitEditRequest');
                     const result = await submitEditRequest({
                         spotName: currentRequestSpot.name,
                         prefecture: currentRequestSpot.prefecture,
@@ -3879,7 +3879,7 @@
                     target.disabled = true;
                     target.textContent = '却下中...';
                     try {
-                        const handleEditRequest = httpsCallable(functions, 'handleEditRequestV2');
+                        const handleEditRequest = httpsCallable(functions, 'handleEditRequest');
                         await handleEditRequest({ requestId, action: 'reject' });
                         showInfoModal("リクエストを却下しました。");
                     } catch (error) {
@@ -3909,7 +3909,7 @@
                     }
                     
                     try {
-                        const handleEditRequest = httpsCallable(functions, 'handleEditRequestV2');
+                        const handleEditRequest = httpsCallable(functions, 'handleEditRequest');
                         const result = await handleEditRequest({ requestId, action: 'approve', updates });
                         await reloadDataAndRefreshUI(result.data.message);
                     } catch (error) {
@@ -3986,7 +3986,7 @@
                 directEditSubmitBtn.textContent = '保存中...';
                 
                 try {
-                    const directAdminSpotUpdate = httpsCallable(functions, 'directAdminSpotUpdateV2');
+                    const directAdminSpotUpdate = httpsCallable(functions, 'directAdminSpotUpdate');
                     const result = await directAdminSpotUpdate({
                         prefecture: currentDirectEditSpot.prefecture,
                         spotName: currentDirectEditSpot.name,
